@@ -82,6 +82,14 @@ export default {
           '0%': { transform: 'scale(0.8)', opacity: '0.6' },
           '100%': { transform: 'scale(2.2)', opacity: '0' },
         },
+        twinkle: {
+          '0%, 100%': { opacity: '0.15', transform: 'scale(0.85)' },
+          '50%': { opacity: '1', transform: 'scale(1.15)' },
+        },
+        'blob-in': {
+          '0%': { opacity: '0', transform: 'scale(0.92) translateY(24px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
       },
       animation: {
         float: 'float 9s ease-in-out infinite',
@@ -90,6 +98,8 @@ export default {
         'fade-up': 'fade-up 0.6s ease-out both',
         'scale-in': 'scale-in 0.5s ease-out both',
         'pulse-ring': 'pulse-ring 2.4s ease-out infinite',
+        twinkle: 'twinkle 3s ease-in-out infinite',
+        'blob-in': 'blob-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
       },
     },
   },

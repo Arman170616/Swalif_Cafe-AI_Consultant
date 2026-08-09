@@ -1,148 +1,67 @@
-import { useEffect, useState, type FormEvent, type InputHTMLAttributes } from 'react';
-import { Loader2 } from 'lucide-react';
-import { MeshBackground } from '../../components/MeshBackground';
+import { useEffect, useState } from 'react';
 import { BrandMark } from '../../components/BrandMark';
 import { LanguageSwitch } from '../../components/LanguageSwitch';
-import { Badge, GlassButton, GlassCard } from '../../components/ui';
-import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { api } from '../../lib/api';
-
-function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-ink-700">{label}</span>
-      <input
-        {...props}
-        className="w-full rounded-xl border border-white/60 bg-white/70 px-4 py-2.5 text-sm text-ink-900 shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-200"
-      />
-    </label>
-  );
-}
+import { BackgroundParticles } from './BackgroundParticles';
+import { LoginForm } from './LoginForm';
+import { WelcomeSection } from './WelcomeSection';
 
 export function AuthPage() {
-  const { login, signup } = useAuth();
   const { t } = useLanguage();
-  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
+  // Mount the entrance animation a tick after paint so it actually plays (a class
+  // present on first render never transitions — it has to be applied after mount).
+  const [entered, setEntered] = useState(false);
   useEffect(() => {
-    api
-      .get<{ needs_setup: boolean }>('/accounts/bootstrap-status/')
-      .then((res) => {
-        setNeedsSetup(res.needs_setup);
-        setMode(res.needs_setup ? 'signup' : 'login');
-      })
-      .catch(() => setNeedsSetup(false));
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      if (mode === 'signup') {
-        await signup(username, password, email || undefined);
-      } else {
-        await login(username, password);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <MeshBackground />
-      <div className="relative w-full max-w-md">
-        <div className="mb-4 flex justify-end">
-          <LanguageSwitch />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-800 to-brand-600 px-4 py-8 sm:px-6">
+      <BackgroundParticles />
+      {/* soft glow blobs behind the card for depth */}
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-accent-500/30 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-brand-400/30 blur-3xl" aria-hidden="true" />
+
+      <div
+        className={[
+          'relative w-full max-w-5xl transition-all duration-700',
+          entered ? 'animate-blob-in' : 'opacity-0',
+        ].join(' ')}
+      >
+        <div className="absolute -top-14 end-0 z-10">
+          <LanguageSwitch className="bg-white/90 shadow-md" />
         </div>
 
-        <GlassCard variant="strong" sheen className="p-8">
-          <div className="mb-6 flex items-center gap-2.5">
-            <span className="relative block h-10 w-10">
-              <BrandMark className="h-10 w-10 rounded-xl" />
-              <span className="absolute inset-0 rounded-xl ring-1 ring-white/40" />
-            </span>
-            <span className="font-display text-xl font-bold tracking-tight text-ink-900">
-              Share<span className="text-brand-600">.</span>
-            </span>
+        <div className="grid overflow-hidden rounded-[2.5rem] bg-white shadow-2xl shadow-brand-950/40 sm:rounded-[3rem] lg:grid-cols-2 lg:rounded-ss-[7rem] lg:rounded-ee-[7rem] lg:rounded-se-[2.5rem] lg:rounded-es-[2.5rem]">
+          {/* Login section */}
+          <div className="flex flex-col justify-center px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
+            <div
+              className={['flex items-center gap-2.5', entered ? 'animate-fade-up' : 'opacity-0'].join(' ')}
+              style={{ animationDelay: '150ms' }}
+            >
+              <BrandMark className="h-9 w-9 rounded-xl" />
+              <span className="font-display text-lg font-bold tracking-tight text-ink-900">
+                Share<span className="text-brand-600">.</span>
+              </span>
+            </div>
+
+            <div className={entered ? 'animate-fade-up' : 'opacity-0'} style={{ animationDelay: '200ms' }}>
+              <h1 className="mt-7 font-display text-3xl font-bold text-ink-900">{t('auth.welcomeBack')}</h1>
+              <p className="mt-1.5 text-sm text-ink-500">{t('auth.welcomeBackSubtitle')}</p>
+            </div>
+
+            <div className={['mt-6', entered ? 'animate-fade-up' : 'opacity-0'].join(' ')} style={{ animationDelay: '300ms' }}>
+              <LoginForm />
+            </div>
           </div>
 
-          {needsSetup && (
-            <Badge tone="accent" className="mb-4">
-              {t('auth.firstTimeSetup')}
-            </Badge>
-          )}
-
-          <h1 className="font-display text-2xl font-bold text-ink-900">
-            {mode === 'signup' ? t('auth.createOwnerAccount') : t('auth.welcomeBack')}
-          </h1>
-          <p className="mt-1.5 text-sm text-ink-500">
-            {mode === 'signup' ? t('auth.createAdminSubtitle') : t('auth.welcomeBackSubtitle')}
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <Field
-              label={t('auth.username')}
-              name="username"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            {mode === 'signup' && (
-              <Field
-                label={t('auth.email')}
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            )}
-            <Field
-              label={t('auth.password')}
-              name="password"
-              type="password"
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            {error && (
-              <p className="rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-sm text-rose-700">
-                {error}
-              </p>
-            )}
-
-            <GlassButton type="submit" variant="primary" size="lg" className="w-full justify-center" disabled={submitting}>
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mode === 'signup' ? (
-                t('auth.createAdminAccount')
-              ) : (
-                t('auth.signIn')
-              )}
-            </GlassButton>
-          </form>
-
-          {needsSetup === false && mode === 'login' && (
-            <p className="mt-5 text-center text-xs text-ink-500">
-              {t('auth.noAccount')}
-            </p>
-          )}
-        </GlassCard>
+          {/* Welcome section — stacks below the login form on mobile/tablet, becomes the
+              second column on desktop */}
+          <div className="relative border-t border-brand-100/70 bg-gradient-to-br from-brand-50 via-white to-accent-50 lg:border-t-0">
+            <WelcomeSection />
+          </div>
+        </div>
       </div>
     </div>
   );

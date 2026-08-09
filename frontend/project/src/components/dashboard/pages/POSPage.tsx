@@ -363,6 +363,7 @@ export function POSPage() {
                   categories={categories}
                   onSaved={() => { setShowAddMenuItem(false); loadMenu(); }}
                   onCancel={() => setShowAddMenuItem(false)}
+                  onCategoryAdded={loadMenu}
                 />
               )}
               {editingProduct && (
@@ -371,6 +372,7 @@ export function POSPage() {
                   product={editingProduct}
                   onSaved={() => { setEditingProduct(null); loadMenu(); }}
                   onCancel={() => setEditingProduct(null)}
+                  onCategoryAdded={loadMenu}
                 />
               )}
 
@@ -730,11 +732,13 @@ function MenuItemForm({
   product,
   onSaved,
   onCancel,
+  onCategoryAdded,
 }: {
   categories: Category[];
   product?: Product;
   onSaved: () => void;
   onCancel: () => void;
+  onCategoryAdded: () => void;
 }) {
   const [name, setName] = useState(product?.name ?? '');
   const [price, setPrice] = useState(product?.price ?? '0');
@@ -742,6 +746,9 @@ function MenuItemForm({
   const [isActive, setIsActive] = useState(product?.is_active ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [addingCategory, setAddingCategory] = useState(false);
   const { t } = useLanguage();
 
   async function submit(e: FormEvent) {
@@ -760,14 +767,55 @@ function MenuItemForm({
     }
   }
 
+  async function addCategory() {
+    if (!newCategoryName.trim() || addingCategory) return;
+    setAddingCategory(true);
+    setError(null);
+    try {
+      const created = await api.post<{ id: number; name: string }>('/inventory/categories/', { name: newCategoryName.trim() });
+      onCategoryAdded();
+      setCategory(String(created.id));
+      setNewCategoryName('');
+      setShowNewCategory(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('pos.addCategoryFailed'));
+    } finally {
+      setAddingCategory(false);
+    }
+  }
+
   return (
     <form onSubmit={submit} className="mb-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
       <input required placeholder={t('pos.name')} value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="number" step="0.001" placeholder={t('pos.priceOmr')} value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
-      <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2">
-        <option value="">{t('pos.noCategory')}</option>
-        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
+      {showNewCategory ? (
+        <div className="flex gap-1.5 sm:col-span-2">
+          <input
+            autoFocus
+            placeholder={t('pos.newCategoryName')}
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }}
+            className="min-w-0 flex-1 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm"
+          />
+          <GlassButton type="button" variant="primary" size="sm" disabled={addingCategory || !newCategoryName.trim()} onClick={addCategory}>
+            {addingCategory ? t('common.saving') : t('common.add')}
+          </GlassButton>
+          <GlassButton type="button" variant="ghost" size="sm" onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }}>
+            {t('common.cancel')}
+          </GlassButton>
+        </div>
+      ) : (
+        <select
+          value={category}
+          onChange={(e) => (e.target.value === '__new__' ? setShowNewCategory(true) : setCategory(e.target.value))}
+          className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2"
+        >
+          <option value="">{t('pos.noCategory')}</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="__new__">{t('pos.addNewCategory')}</option>
+        </select>
+      )}
       {product && (
         <label className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm text-ink-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> {t('pos.active')}
