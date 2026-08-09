@@ -14,6 +14,8 @@ import {
 import { GlassCard, GlassButton } from '../../ui';
 import { api, ApiError, downloadFile } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { TranslationKey } from '../../../lib/translations';
 
 /* ─── API types (mirrors HRPage.tsx, scoped to "me" by the backend) ────────── */
 
@@ -29,6 +31,7 @@ function unwrap<T>(res: { results?: T[] } | T[]): T[] {
 
 export function StaffHRPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'performance' | 'attendance' | 'payroll' | 'leave'>('performance');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -81,7 +84,7 @@ export function StaffHRPage() {
       await api.post('/hr/attendance/', { employee: employee.id, date: today, status: 'present', check_in: new Date().toISOString() });
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to check in.');
+      alert(err instanceof ApiError ? err.message : t('staffHr.checkInFailed'));
     } finally {
       setActing(false);
     }
@@ -93,7 +96,7 @@ export function StaffHRPage() {
       await api.patch(`/hr/attendance/${todayRecord.id}/`, { check_out: new Date().toISOString() });
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to check out.');
+      alert(err instanceof ApiError ? err.message : t('staffHr.checkOutFailed'));
     } finally {
       setActing(false);
     }
@@ -106,20 +109,19 @@ export function StaffHRPage() {
   if (notFound || !employee) {
     return (
       <GlassCard variant="strong" className="p-10 text-center">
-        <h2 className="font-display text-xl font-bold text-ink-900">No HR profile linked yet</h2>
+        <h2 className="font-display text-xl font-bold text-ink-900">{t('staffHr.noProfileTitle')}</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-500">
-          Your account ({user?.username}) isn't attached to an HR employee record yet. Ask an Admin or Manager to
-          add you from the HR & Payroll page.
+          {t('staffHr.noProfileDesc', { username: user?.username ?? '' })}
         </p>
       </GlassCard>
     );
   }
 
   const kpis = [
-    { label: 'This Month', value: performance ? String(performance.orders_served) : '0', icon: Trophy, sub: 'orders served' },
-    { label: 'Revenue Generated', value: `OMR ${(performance?.revenue_generated ?? 0).toLocaleString()}`, icon: DollarSign, sub: 'last 30 days' },
-    { label: 'Attendance Rate', value: attendanceRate != null ? `${attendanceRate}%` : '—', icon: CalendarCheck, sub: 'approved records' },
-    { label: 'Open Leave Requests', value: String(openLeaves), icon: Clock, sub: 'pending approval' },
+    { label: t('staffHr.thisMonth'), value: performance ? String(performance.orders_served) : '0', icon: Trophy, sub: t('staffHr.ordersServed') },
+    { label: t('staffHr.revenueGenerated'), value: `OMR ${(performance?.revenue_generated ?? 0).toLocaleString()}`, icon: DollarSign, sub: t('pos.last30Days') },
+    { label: t('hr.attendanceRate'), value: attendanceRate != null ? `${attendanceRate}%` : '—', icon: CalendarCheck, sub: t('staffHr.approvedRecords') },
+    { label: t('staffHr.openLeaveRequests'), value: String(openLeaves), icon: Clock, sub: t('staffHr.pendingApproval') },
   ];
 
   return (
@@ -147,7 +149,7 @@ export function StaffHRPage() {
           </span>
           <div>
             <div className="font-display text-base font-bold text-ink-900">{employee.full_name || employee.username}</div>
-            <div className="text-xs text-ink-500">{employee.position} · joined {employee.hire_date}</div>
+            <div className="text-xs text-ink-500">{employee.position} · {t('staffHr.joined', { date: employee.hire_date })}</div>
           </div>
         </div>
 
@@ -158,7 +160,7 @@ export function StaffHRPage() {
               onClick={() => setActiveTab(tab)}
               className={['rounded-xl px-4 py-1.5 text-sm font-semibold transition-all capitalize', activeTab === tab ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60'].join(' ')}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'performance' ? t('pos.performance') : t(`hr.${tab}` as TranslationKey)}
             </button>
           ))}
         </div>
@@ -168,20 +170,20 @@ export function StaffHRPage() {
             {performance ? (
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/40 bg-white/30 p-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><Trophy className="h-3.5 w-3.5 text-amber-500" /> Rank</div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><Trophy className="h-3.5 w-3.5 text-amber-500" /> {t('staffHr.rank')}</div>
                   <div className="mt-2 font-display text-2xl font-bold text-ink-900">#{performance.rank}</div>
                 </div>
                 <div className="rounded-2xl border border-white/40 bg-white/30 p-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><DollarSign className="h-3.5 w-3.5 text-brand-600" /> Revenue generated</div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><DollarSign className="h-3.5 w-3.5 text-brand-600" /> {t('staffHr.revenueGenerated')}</div>
                   <div className="mt-2 font-display text-2xl font-bold text-ink-900">OMR {performance.revenue_generated.toLocaleString()}</div>
                 </div>
                 <div className="rounded-2xl border border-white/40 bg-white/30 p-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><Star className="h-3.5 w-3.5 text-amber-500" /> Average rating</div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-ink-500"><Star className="h-3.5 w-3.5 text-amber-500" /> {t('staffHr.averageRating')}</div>
                   <div className="mt-2 font-display text-2xl font-bold text-ink-900">{performance.average_rating != null ? performance.average_rating.toFixed(1) : '—'}</div>
                 </div>
               </div>
             ) : (
-              <p className="py-6 text-center text-sm text-ink-400">No orders served yet in this period.</p>
+              <p className="py-6 text-center text-sm text-ink-400">{t('staffHr.noOrdersPeriod')}</p>
             )}
           </div>
         )}
@@ -190,42 +192,45 @@ export function StaffHRPage() {
           <div className="mt-5">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/40 bg-white/30 p-4">
               <div>
-                <div className="text-sm font-semibold text-ink-900">Today · {today}</div>
+                <div className="text-sm font-semibold text-ink-900">{t('staffHr.today', { date: today })}</div>
                 <div className="mt-1 text-xs text-ink-500">
                   {todayRecord
-                    ? `${todayRecord.status === 'present' ? 'Checked in' : todayRecord.status} at ${todayRecord.check_in ? new Date(todayRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}${todayRecord.check_out ? ` · checked out ${new Date(todayRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`
-                    : "You haven't checked in yet today."}
+                    ? <>
+                        {t('staffHr.checkedInAt', { time: todayRecord.check_in ? new Date(todayRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—' })}
+                        {todayRecord.check_out ? t('staffHr.checkedOutAt', { time: new Date(todayRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : ''}
+                      </>
+                    : t('staffHr.notCheckedInYet')}
                 </div>
                 {todayRecord && <ApprovalStatusPill status={todayRecord.approval_status} />}
               </div>
               <div className="flex gap-2">
-                {!todayRecord && <GlassButton variant="primary" size="sm" disabled={acting} onClick={checkIn}><LogIn className="h-3.5 w-3.5" /> Check in</GlassButton>}
-                {todayRecord && !todayRecord.check_out && <GlassButton variant="primary" size="sm" disabled={acting} onClick={checkOut}><LogOut className="h-3.5 w-3.5" /> Check out</GlassButton>}
+                {!todayRecord && <GlassButton variant="primary" size="sm" disabled={acting} onClick={checkIn}><LogIn className="h-3.5 w-3.5" /> {t('staffHr.checkIn')}</GlassButton>}
+                {todayRecord && !todayRecord.check_out && <GlassButton variant="primary" size="sm" disabled={acting} onClick={checkOut}><LogOut className="h-3.5 w-3.5" /> {t('staffHr.checkOut')}</GlassButton>}
               </div>
             </div>
-            <p className="mb-2 mt-5 text-xs text-ink-500">Checking in submits it for your Manager/Admin to accept — it only counts toward your attendance rate once approved.</p>
+            <p className="mb-2 mt-5 text-xs text-ink-500">{t('staffHr.checkInExplainer')}</p>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-sm">
+              <table className="w-full min-w-[520px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Date</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold">Check-in</th>
-                    <th className="pb-3 font-semibold">Check-out</th>
-                    <th className="pb-3 font-semibold">Approval</th>
+                    <th className="pb-3 font-semibold">{t('common.date')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.checkInCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.checkOutCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.approvalCol')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/40">
                   {attendance.map((a) => (
                     <tr key={a.id} className="hover:bg-white/30">
                       <td className="py-3 text-ink-900">{a.date}</td>
-                      <td className="py-3 capitalize text-ink-600">{a.status.replace('_', ' ')}</td>
+                      <td className="py-3 capitalize text-ink-600">{t(`hr.attStatus.${a.status}` as TranslationKey)}</td>
                       <td className="py-3 text-ink-600">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                       <td className="py-3 text-ink-600">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                       <td className="py-3"><ApprovalStatusPill status={a.approval_status} /></td>
                     </tr>
                   ))}
-                  {attendance.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-sm text-ink-400">No attendance records yet.</td></tr>}
+                  {attendance.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-sm text-ink-400">{t('staffHr.noAttendanceYet')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -234,13 +239,13 @@ export function StaffHRPage() {
 
         {activeTab === 'payroll' && (
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
+            <table className="w-full min-w-[520px] text-start text-sm">
               <thead>
                 <tr className="text-xs uppercase tracking-wider text-ink-400">
-                  <th className="pb-3 font-semibold">Period</th>
-                  <th className="pb-3 text-right font-semibold">Base</th>
-                  <th className="pb-3 text-right font-semibold">Overtime</th>
-                  <th className="pb-3 text-right font-semibold">Net</th>
+                  <th className="pb-3 font-semibold">{t('hr.periodCol')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('hr.baseCol')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('hr.overtimeCol')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('hr.netCol')}</th>
                   <th className="pb-3"></th>
                 </tr>
               </thead>
@@ -248,17 +253,17 @@ export function StaffHRPage() {
                 {payslips.map((p) => (
                   <tr key={p.id} className="hover:bg-white/30">
                     <td className="py-3 text-ink-600">{p.period_start} → {p.period_end}</td>
-                    <td className="py-3 text-right text-ink-600">OMR {Number(p.base_salary).toFixed(2)}</td>
-                    <td className="py-3 text-right text-ink-600">OMR {Number(p.overtime_amount).toFixed(2)}</td>
-                    <td className="py-3 text-right font-semibold text-brand-700">OMR {Number(p.net_salary).toFixed(2)}</td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 text-end text-ink-600">OMR {Number(p.base_salary).toFixed(2)}</td>
+                    <td className="py-3 text-end text-ink-600">OMR {Number(p.overtime_amount).toFixed(2)}</td>
+                    <td className="py-3 text-end font-semibold text-brand-700">OMR {Number(p.net_salary).toFixed(2)}</td>
+                    <td className="py-3 text-end">
                       <button onClick={() => downloadFile(`/payroll/payslips/${p.id}/pdf/`, `payslip-${p.id}.pdf`)} className="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-white/60 hover:text-ink-700">
                         <Download className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
                 ))}
-                {payslips.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-sm text-ink-400">No payslips yet.</td></tr>}
+                {payslips.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-sm text-ink-400">{t('staffHr.noPayslipsYet')}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -268,32 +273,32 @@ export function StaffHRPage() {
           <div className="mt-5">
             <div className="flex justify-end">
               <GlassButton variant="primary" size="sm" onClick={() => setShowNewLeave((v) => !v)}>
-                <Plus className="h-3.5 w-3.5" /> New request
+                <Plus className="h-3.5 w-3.5" /> {t('hr.newRequest')}
               </GlassButton>
             </div>
             {showNewLeave && (
               <NewLeaveForm employeeId={employee.id} onSaved={() => { setShowNewLeave(false); load(); }} onCancel={() => setShowNewLeave(false)} />
             )}
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-sm">
+              <table className="w-full min-w-[480px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Type</th>
-                    <th className="pb-3 font-semibold">From</th>
-                    <th className="pb-3 font-semibold">To</th>
-                    <th className="pb-3 font-semibold">Status</th>
+                    <th className="pb-3 font-semibold">{t('hr.typeCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.fromCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.toCol')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/40">
                   {leaveRequests.map((l) => (
                     <tr key={l.id} className="hover:bg-white/30">
-                      <td className="py-3 capitalize text-ink-900">{l.leave_type}</td>
+                      <td className="py-3 capitalize text-ink-900">{t(`hr.leaveType.${l.leave_type}` as TranslationKey)}</td>
                       <td className="py-3 text-ink-600">{l.start_date}</td>
                       <td className="py-3 text-ink-600">{l.end_date}</td>
                       <td className="py-3"><LeaveStatusPill status={l.status} /></td>
                     </tr>
                   ))}
-                  {leaveRequests.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-sm text-ink-400">No leave requests yet.</td></tr>}
+                  {leaveRequests.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-sm text-ink-400">{t('staffHr.noLeaveYet')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -307,6 +312,7 @@ export function StaffHRPage() {
 /* ─── inline form ────────────────────────────────────────────────────────── */
 
 function NewLeaveForm({ employeeId, onSaved, onCancel }: { employeeId: number; onSaved: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   const [leaveType, setLeaveType] = useState('annual');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -322,7 +328,7 @@ function NewLeaveForm({ employeeId, onSaved, onCancel }: { employeeId: number; o
       await api.post('/hr/leave/', { employee: employeeId, leave_type: leaveType, start_date: startDate, end_date: endDate, reason });
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to submit leave request.');
+      setError(err instanceof ApiError ? err.message : t('hr.submitLeaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -331,18 +337,18 @@ function NewLeaveForm({ employeeId, onSaved, onCancel }: { employeeId: number; o
   return (
     <form onSubmit={submit} className="mt-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
       <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2">
-        <option value="annual">Annual</option>
-        <option value="sick">Sick</option>
-        <option value="unpaid">Unpaid</option>
-        <option value="other">Other</option>
+        <option value="annual">{t('hr.leaveType.annual')}</option>
+        <option value="sick">{t('hr.leaveType.sick')}</option>
+        <option value="unpaid">{t('hr.leaveType.unpaid')}</option>
+        <option value="other">{t('hr.leaveType.other')}</option>
       </select>
       <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-4" />
+      <input placeholder={t('hr.reasonOptional')} value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-4" />
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Submitting…' : 'Submit'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('staffHr.submitting') : t('hr.submit')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
@@ -351,19 +357,21 @@ function NewLeaveForm({ employeeId, onSaved, onCancel }: { employeeId: number; o
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
 function ApprovalStatusPill({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, string> = {
     approved: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
     pending: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
     rejected: 'bg-rose-100/70 text-rose-600 border-rose-200/60',
   };
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{t(`hr.status.${status}` as TranslationKey)}</span>;
 }
 
 function LeaveStatusPill({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, string> = {
     approved: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
     pending: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
     rejected: 'bg-rose-100/70 text-rose-600 border-rose-200/60',
   };
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{t(`hr.status.${status}` as TranslationKey)}</span>;
 }

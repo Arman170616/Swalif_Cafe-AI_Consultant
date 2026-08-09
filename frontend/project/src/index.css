@@ -20,6 +20,13 @@ body {
   overflow-x: hidden;
 }
 
+/* Arabic (RTL): swap in a proper Arabic typeface everywhere — Inter/Sora have no real
+   Arabic glyph coverage, they'd fall back to an ugly system font otherwise. */
+html[dir='rtl'] body,
+html[dir='rtl'] .font-display {
+  font-family: 'Tajawal', 'Inter', system-ui, sans-serif;
+}
+
 ::selection {
   background: rgba(150, 48, 74, 0.25);
   color: rgb(var(--ink));

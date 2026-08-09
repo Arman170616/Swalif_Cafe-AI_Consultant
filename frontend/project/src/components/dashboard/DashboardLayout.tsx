@@ -35,7 +35,7 @@ export function DashboardLayout({
         role={user?.role}
       />
 
-      <div className="lg:pl-72">
+      <div className="lg:ps-72">
         <Topbar title={title} subtitle={subtitle} onMenu={() => setOpen(true)} user={user} onSignOut={logout} />
         <main className="px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>

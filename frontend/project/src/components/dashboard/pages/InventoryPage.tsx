@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { GlassCard, GlassButton } from '../../ui';
 import { api, ApiError } from '../../../lib/api';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 type Ingredient = {
   id: number;
@@ -33,6 +34,7 @@ function statusOf(i: Ingredient): 'in' | 'low' | 'out' {
 }
 
 export function InventoryPage() {
+  const { t } = useLanguage();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function InventoryPage() {
     api
       .get<{ results?: Ingredient[] } | Ingredient[]>('/inventory/ingredients/')
       .then((res) => setIngredients(Array.isArray(res) ? res : res.results ?? []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load inventory.'))
+      .catch((err) => setError(err instanceof ApiError ? err.message : t('inv.loadFailed')))
       .finally(() => setLoading(false));
   };
 
@@ -64,14 +66,14 @@ export function InventoryPage() {
   const outCount = ingredients.filter((i) => statusOf(i) === 'out').length;
 
   const stats = [
-    { label: 'Total ingredients', value: String(ingredients.length), icon: Package, tone: 'brand' },
-    { label: 'Stock value', value: `OMR ${stockValue.toFixed(2)}`, icon: Boxes, tone: 'accent' },
-    { label: 'Low stock', value: String(lowCount), icon: AlertTriangle, tone: 'amber' },
-    { label: 'Out of stock', value: String(outCount), icon: TrendingDown, tone: 'rose' },
+    { label: t('inv.totalIngredients'), value: String(ingredients.length), icon: Package, tone: 'brand' },
+    { label: t('inv.stockValue'), value: `OMR ${stockValue.toFixed(2)}`, icon: Boxes, tone: 'accent' },
+    { label: t('inv.lowStockStat'), value: String(lowCount), icon: AlertTriangle, tone: 'amber' },
+    { label: t('inv.outOfStockStat'), value: String(outCount), icon: TrendingDown, tone: 'rose' },
   ];
 
   async function restock(ingredient: Ingredient) {
-    const qty = window.prompt(`Purchase quantity for ${ingredient.name} (${ingredient.unit}):`, '10');
+    const qty = window.prompt(t('inv.purchaseQtyPrompt', { name: ingredient.name, unit: ingredient.unit }), '10');
     if (!qty || Number(qty) <= 0) return;
     try {
       await api.post('/inventory/stock-movements/', {
@@ -81,17 +83,17 @@ export function InventoryPage() {
       });
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to record stock movement.');
+      alert(err instanceof ApiError ? err.message : t('inv.restockFailed'));
     }
   }
 
   async function deleteIngredient(ingredient: Ingredient) {
-    if (!window.confirm(`Delete "${ingredient.name}"? This can't be undone.`)) return;
+    if (!window.confirm(t('inv.deleteConfirm', { name: ingredient.name }))) return;
     try {
       await api.delete(`/inventory/ingredients/${ingredient.id}/`);
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to delete ingredient.');
+      alert(err instanceof ApiError ? err.message : t('inv.deleteFailed'));
     }
   }
 
@@ -123,8 +125,8 @@ export function InventoryPage() {
       <GlassCard className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-display text-base font-bold text-ink-900">Ingredients</h3>
-            <p className="text-xs text-ink-500">{ingredients.length} tracked · {shown.length} shown</p>
+            <h3 className="font-display text-base font-bold text-ink-900">{t('inv.ingredients')}</h3>
+            <p className="text-xs text-ink-500">{t('inv.trackedShown', { tracked: String(ingredients.length), shown: String(shown.length) })}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 rounded-full border border-white/50 bg-white/40 px-3 py-2">
@@ -132,7 +134,7 @@ export function InventoryPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name…"
+                placeholder={t('inv.searchByName')}
                 className="w-44 bg-transparent text-sm text-ink-700 placeholder:text-ink-400 focus:outline-none"
               />
             </div>
@@ -146,15 +148,15 @@ export function InventoryPage() {
                     filter === f ? 'bg-brand-500 text-white' : 'text-ink-500 hover:text-ink-800',
                   ].join(' ')}
                 >
-                  {f === 'all' ? 'All' : f === 'low' ? 'Low' : 'Out'}
+                  {f === 'all' ? t('inv.all') : f === 'low' ? t('inv.low') : t('inv.out')}
                 </button>
               ))}
             </div>
             <GlassButton variant="glass" size="sm" onClick={load}>
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              <RefreshCw className="h-3.5 w-3.5" /> {t('inv.refresh')}
             </GlassButton>
             <GlassButton variant="primary" size="sm" onClick={() => setShowAdd((v) => !v)}>
-              <Plus className="h-3.5 w-3.5" /> Add ingredient
+              <Plus className="h-3.5 w-3.5" /> {t('inv.addIngredient')}
             </GlassButton>
           </div>
         </div>
@@ -177,12 +179,12 @@ export function InventoryPage() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="text-xs uppercase tracking-wider text-ink-400">
-                  <th className="pb-3 font-semibold"><span className="inline-flex items-center gap-1">SKU <ArrowUpDown className="h-3 w-3" /></span></th>
-                  <th className="pb-3 font-semibold">Ingredient</th>
-                  <th className="pb-3 font-semibold">Unit</th>
-                  <th className="pb-3 text-right font-semibold">Stock</th>
-                  <th className="pb-3 text-right font-semibold">Cost/unit</th>
-                  <th className="pb-3 font-semibold">Status</th>
+                  <th className="pb-3 font-semibold"><span className="inline-flex items-center gap-1">{t('inv.sku')} <ArrowUpDown className="h-3 w-3" /></span></th>
+                  <th className="pb-3 font-semibold">{t('inv.ingredient')}</th>
+                  <th className="pb-3 font-semibold">{t('inv.unit')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('inv.stock')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('inv.costPerUnit')}</th>
+                  <th className="pb-3 font-semibold">{t('common.status')}</th>
                   <th className="pb-3"></th>
                 </tr>
               </thead>
@@ -194,27 +196,27 @@ export function InventoryPage() {
                       <td className="py-3 font-mono text-xs text-ink-500">#{i.id}</td>
                       <td className="py-3 font-semibold text-ink-900">{i.name}</td>
                       <td className="py-3 text-ink-600">{i.unit}</td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end">
                         <span className={['font-semibold', status === 'out' ? 'text-rose-500' : status === 'low' ? 'text-amber-600' : 'text-ink-900'].join(' ')}>
                           {Number(i.quantity_on_hand).toFixed(2)}
                         </span>
                         <span className="text-xs text-ink-400"> / {Number(i.reorder_threshold).toFixed(2)}</span>
                       </td>
-                      <td className="py-3 text-right font-medium text-ink-900">OMR {Number(i.cost_per_unit).toFixed(3)}</td>
+                      <td className="py-3 text-end font-medium text-ink-900">OMR {Number(i.cost_per_unit).toFixed(3)}</td>
                       <td className="py-3"><StockStatus status={status} /></td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end">
                         <div className="flex items-center justify-end gap-1.5">
-                          <GlassButton variant="glass" size="sm" onClick={() => restock(i)}>Restock</GlassButton>
+                          <GlassButton variant="glass" size="sm" onClick={() => restock(i)}>{t('inv.restock')}</GlassButton>
                           <button
                             onClick={() => setEditingIngredient(i)}
-                            title="Edit"
+                            title={t('common.edit')}
                             className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-white/60 hover:text-ink-700"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => deleteIngredient(i)}
-                            title="Delete"
+                            title={t('common.delete')}
                             className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -225,7 +227,7 @@ export function InventoryPage() {
                   );
                 })}
                 {shown.length === 0 && (
-                  <tr><td colSpan={7} className="py-6 text-center text-sm text-ink-400">No ingredients match.</td></tr>
+                  <tr><td colSpan={7} className="py-6 text-center text-sm text-ink-400">{t('inv.noIngredientsMatch')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -251,6 +253,7 @@ function IngredientForm({
   const [cost, setCost] = useState(ingredient?.cost_per_unit ?? '0');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -262,7 +265,7 @@ function IngredientForm({
       else await api.post('/inventory/ingredients/', body);
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save ingredient.');
+      setError(err instanceof ApiError ? err.message : t('inv.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -270,24 +273,25 @@ function IngredientForm({
 
   return (
     <form onSubmit={submit} className="mt-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-5">
-      <input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required placeholder="Unit (kg, l, pcs)" value={unit} onChange={(e) => setUnit(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
-      <input required type="number" step="0.001" placeholder="Reorder threshold" value={reorder} onChange={(e) => setReorder(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
-      <input required type="number" step="0.001" placeholder="Cost per unit" value={cost} onChange={(e) => setCost(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
+      <input required placeholder={t('inv.name')} value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required placeholder={t('inv.unitPlaceholder')} value={unit} onChange={(e) => setUnit(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
+      <input required type="number" step="0.001" placeholder={t('inv.reorderThreshold')} value={reorder} onChange={(e) => setReorder(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
+      <input required type="number" step="0.001" placeholder={t('inv.costPerUnitPlaceholder')} value={cost} onChange={(e) => setCost(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
       {error && <p className="sm:col-span-5 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-5">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : ingredient ? 'Save changes' : 'Save'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('common.saving') : ingredient ? t('pos.saveChanges') : t('common.save')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
 }
 
 function StockStatus({ status }: { status: 'in' | 'low' | 'out' }) {
+  const { t } = useLanguage();
   const map = {
-    in: { label: 'In stock', cls: 'bg-brand-100/70 text-brand-700 border-brand-200/60' },
-    low: { label: 'Low', cls: 'bg-amber-100/70 text-amber-700 border-amber-200/60' },
-    out: { label: 'Out', cls: 'bg-rose-100/70 text-rose-600 border-rose-200/60' },
+    in: { label: t('inv.inStock'), cls: 'bg-brand-100/70 text-brand-700 border-brand-200/60' },
+    low: { label: t('inv.lowStock'), cls: 'bg-amber-100/70 text-amber-700 border-amber-200/60' },
+    out: { label: t('inv.outOfStock'), cls: 'bg-rose-100/70 text-rose-600 border-rose-200/60' },
   };
   const s = map[status];
   return (

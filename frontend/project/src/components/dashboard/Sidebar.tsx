@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import type { Role } from '../../contexts/AuthContext';
 import { BrandMark } from '../BrandMark';
+import { LanguageSwitch } from '../LanguageSwitch';
+import { useLanguage } from '../../contexts/LanguageContext';
+import type { TranslationKey } from '../../lib/translations';
 
 export type NavKey =
   | 'dashboard'
@@ -23,37 +26,37 @@ export type NavKey =
 
 type NavItem = {
   key: NavKey;
-  label: string;
+  labelKey: TranslationKey;
   icon: typeof LayoutDashboard;
-  badge?: string;
+  badge?: TranslationKey;
   /** Omit to allow every role; otherwise only these roles see the item. */
   roles?: Role[];
 };
 
 // Mirrors the backend's actual permission classes (accounts/permissions.py, per-viewset
 // role gates) so the sidebar never offers a route that would just 403.
-const groups: { title: string; items: NavItem[] }[] = [
+const groups: { titleKey: TranslationKey; items: NavItem[] }[] = [
   {
-    title: 'Overview',
-    items: [{ key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] }],
+    titleKey: 'nav.overview',
+    items: [{ key: 'dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] }],
   },
   {
-    title: 'Operations',
+    titleKey: 'nav.operations',
     items: [
-      { key: 'pos', label: 'Sales & POS', icon: ShoppingCart, badge: 'Live', roles: ['admin', 'manager'] },
-      { key: 'inventory', label: 'Inventory', icon: Boxes, roles: ['admin', 'manager'] },
+      { key: 'pos', labelKey: 'nav.pos', icon: ShoppingCart, badge: 'nav.live', roles: ['admin', 'manager'] },
+      { key: 'inventory', labelKey: 'nav.inventory', icon: Boxes, roles: ['admin', 'manager'] },
     ],
   },
   {
-    title: 'Finance',
+    titleKey: 'nav.finance',
     items: [
-      { key: 'accounting', label: 'Accounting', icon: Calculator, roles: ['admin', 'manager'] },
-      { key: 'reports', label: 'Reports', icon: FileBarChart, roles: ['admin'] },
+      { key: 'accounting', labelKey: 'nav.accounting', icon: Calculator, roles: ['admin', 'manager'] },
+      { key: 'reports', labelKey: 'nav.reports', icon: FileBarChart, roles: ['admin'] },
     ],
   },
   {
-    title: 'People',
-    items: [{ key: 'hr', label: 'HR & Payroll', icon: Briefcase, roles: ['admin', 'manager', 'staff'] }],
+    titleKey: 'nav.people',
+    items: [{ key: 'hr', labelKey: 'nav.hr', icon: Briefcase, roles: ['admin', 'manager', 'staff'] }],
   },
 ];
 
@@ -72,6 +75,7 @@ export function Sidebar({
   onSignOut: () => void;
   role: Role | undefined;
 }) {
+  const { t } = useLanguage();
   const visibleGroups = groups
     .map((g) => ({ ...g, items: g.items.filter((it) => !it.roles || (role && it.roles.includes(role))) }))
     .filter((g) => g.items.length > 0);
@@ -88,8 +92,13 @@ export function Sidebar({
 
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 lg:translate-x-0',
-          open ? 'translate-x-0' : '-translate-x-full',
+          'fixed inset-y-0 start-0 z-40 w-72 transform transition-transform duration-300 lg:translate-x-0',
+          // max-lg: scopes the closed/off-screen state to below the lg breakpoint, so it
+          // never competes on specificity with lg:translate-x-0 — an unscoped
+          // `rtl:translate-x-full` has higher specificity than `lg:translate-x-0` (an
+          // extra [dir="rtl"] attribute selector), which made the sidebar stay permanently
+          // off-screen at desktop widths whenever the app was in Arabic.
+          open ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full',
         ].join(' ')}
       >
         <div className="glass-strong m-3 flex h-[calc(100%-1.5rem)] flex-col rounded-3xl p-4 shadow-glass-lg">
@@ -109,12 +118,16 @@ export function Sidebar({
             </button>
           </div>
 
+          <div className="px-2 pt-2 sm:hidden">
+            <LanguageSwitch className="w-full justify-center" />
+          </div>
+
           {/* Nav */}
           <nav className="no-scrollbar mt-3 flex-1 space-y-5 overflow-y-auto pb-4">
             {visibleGroups.map((g) => (
-              <div key={g.title}>
+              <div key={g.titleKey}>
                 <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">
-                  {g.title}
+                  {t(g.titleKey)}
                 </div>
                 <div className="mt-1.5 space-y-0.5">
                   {g.items.map((it) => {
@@ -137,7 +150,7 @@ export function Sidebar({
                             isActive ? 'text-white' : 'text-ink-500 group-hover:text-brand-600',
                           ].join(' ')}
                         />
-                        <span className="flex-1 text-left">{it.label}</span>
+                        <span className="flex-1 text-start">{t(it.labelKey)}</span>
                         {it.badge && (
                           <span
                             className={[
@@ -147,7 +160,7 @@ export function Sidebar({
                                 : 'bg-brand-100 text-brand-700',
                             ].join(' ')}
                           >
-                            {it.badge}
+                            {t(it.badge)}
                           </span>
                         )}
                       </button>
@@ -169,13 +182,13 @@ export function Sidebar({
                   : 'text-ink-600 hover:bg-white/60 hover:text-ink-900',
               ].join(' ')}
             >
-              <LifeBuoy className="h-4.5 w-4.5" /> Help & support
+              <LifeBuoy className="h-4.5 w-4.5" /> {t('nav.help')}
             </button>
             <button
               onClick={onSignOut}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:bg-white/60 hover:text-ink-900"
             >
-              <LogOut className="h-4.5 w-4.5" /> Sign out
+              <LogOut className="h-4.5 w-4.5" /> {t('nav.signOut')}
             </button>
           </div>
         </div>

@@ -31,6 +31,8 @@ import { GlassCard, GlassButton } from '../../ui';
 import { printThermalReceipt, type ReceiptData } from '../../../utils/thermalPrint';
 import { api, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { TranslationKey } from '../../../lib/translations';
 
 /* ─── API types ──────────────────────────────────────────────────────────── */
 
@@ -62,11 +64,11 @@ type StaffMember = { id: number; username: string; role: string };
 
 type EmployeePerf = { user_id: number; username: string; orders_served: number; revenue_generated: string; average_rating: number | null; rank: number };
 
-const ORDER_STATUS: Record<string, { label: string; color: string; icon: typeof Clock; bg: string; next: string | null; nextLabel: string }> = {
-  pending: { label: 'New', color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-100/70 border-rose-200/60', next: 'preparing', nextLabel: 'Start Preparing' },
-  preparing: { label: 'Preparing', color: 'text-amber-600', icon: Clock, bg: 'bg-amber-100/70 border-amber-200/60', next: 'ready', nextLabel: 'Mark Ready' },
-  ready: { label: 'Ready', color: 'text-brand-700', icon: CheckCircle2, bg: 'bg-brand-100/70 border-brand-200/60', next: 'delivered', nextLabel: 'Mark Served' },
-  delivered: { label: 'Served', color: 'text-ink-500', icon: Check, bg: 'bg-ink-100/70 border-ink-200/60', next: null, nextLabel: 'Completed' },
+const ORDER_STATUS: Record<string, { labelKey: TranslationKey; color: string; icon: typeof Clock; bg: string; next: string | null; nextLabelKey: TranslationKey }> = {
+  pending: { labelKey: 'pos.status.new', color: 'text-rose-600', icon: AlertCircle, bg: 'bg-rose-100/70 border-rose-200/60', next: 'preparing', nextLabelKey: 'pos.next.startPreparing' },
+  preparing: { labelKey: 'pos.status.preparing', color: 'text-amber-600', icon: Clock, bg: 'bg-amber-100/70 border-amber-200/60', next: 'ready', nextLabelKey: 'pos.next.markReady' },
+  ready: { labelKey: 'pos.status.ready', color: 'text-brand-700', icon: CheckCircle2, bg: 'bg-brand-100/70 border-brand-200/60', next: 'delivered', nextLabelKey: 'pos.next.markServed' },
+  delivered: { labelKey: 'pos.status.served', color: 'text-ink-500', icon: Check, bg: 'bg-ink-100/70 border-ink-200/60', next: null, nextLabelKey: 'pos.next.completed' },
 };
 const STATUS_LANES = ['pending', 'preparing', 'ready', 'delivered'];
 
@@ -77,6 +79,7 @@ type Tab = 'pos' | 'orders' | 'performance';
 
 export function POSPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('pos');
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -165,8 +168,8 @@ export function POSPage() {
   }, [activeTab, canSeePerformance]);
 
   const tabCategories = useMemo(
-    () => [{ id: '__all__', name: 'All' }, ...categories.map((c) => ({ id: String(c.id), name: c.name }))],
-    [categories]
+    () => [{ id: '__all__', name: t('pos.all') }, ...categories.map((c) => ({ id: String(c.id), name: c.name }))],
+    [categories, t]
   );
 
   const displayed = query
@@ -234,7 +237,7 @@ export function POSPage() {
       setTableNote('');
       loadOrders();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to charge order.');
+      alert(err instanceof ApiError ? err.message : t('pos.chargeFailed'));
     } finally {
       setCharging(false);
     }
@@ -252,12 +255,12 @@ export function POSPage() {
   }
 
   async function cancelOrder(order: OrderT) {
-    if (!window.confirm(`Cancel order #${order.id}?`)) return;
+    if (!window.confirm(t('pos.cancelOrderConfirm', { id: String(order.id) }))) return;
     try {
       await api.post(`/pos/orders/${order.id}/cancel/`);
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to cancel order.');
+      alert(err instanceof ApiError ? err.message : t('pos.cancelFailed'));
     }
   }
 
@@ -276,19 +279,19 @@ export function POSPage() {
       {/* Top tabs */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-2xl bg-white/40 p-1">
-          {(['pos', 'orders', ...(canSeePerformance ? (['performance'] as Tab[]) : [])] as Tab[]).map((t) => (
+          {(['pos', 'orders', ...(canSeePerformance ? (['performance'] as Tab[]) : [])] as Tab[]).map((tab) => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={[
                 'flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold capitalize transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm',
-                activeTab === t ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60',
+                activeTab === tab ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60',
               ].join(' ')}
             >
-              {t === 'pos' ? <ShoppingCart className="h-4 w-4" /> : t === 'orders' ? <ChefHat className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-              <span className="sm:hidden">{t === 'pos' ? 'POS' : t === 'orders' ? 'OM' : 'Perf'}</span>
-              <span className="hidden sm:inline">{t === 'pos' ? 'Point of Sale' : t === 'orders' ? 'Order Management' : 'Performance'}</span>
-              {t === 'orders' && (
+              {tab === 'pos' ? <ShoppingCart className="h-4 w-4" /> : tab === 'orders' ? <ChefHat className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+              <span className="sm:hidden">{tab === 'pos' ? t('pos.pointOfSaleShort') : tab === 'orders' ? t('pos.orderManagementShort') : t('pos.performanceShort')}</span>
+              <span className="hidden sm:inline">{tab === 'pos' ? t('pos.pointOfSale') : tab === 'orders' ? t('pos.orderManagement') : t('pos.performance')}</span>
+              {tab === 'orders' && (
                 <span className={['rounded-full px-1.5 py-0.5 text-[9px] font-bold', activeTab === 'orders' ? 'bg-white/25 text-white' : 'bg-brand-100 text-brand-700'].join(' ')}>
                   {activeOrders.filter((o) => o.status !== 'delivered').length}
                 </span>
@@ -296,7 +299,7 @@ export function POSPage() {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ms-auto flex items-center gap-2">
           <Coffee className="h-5 w-5 shrink-0 text-amber-700" />
           <span className="font-display text-sm font-bold text-ink-900 sm:text-base">
             <span className="sm:hidden">Salalah, Oman</span>
@@ -316,7 +319,7 @@ export function POSPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search menu items…"
+                  placeholder={t('pos.searchMenu')}
                   className="flex-1 bg-transparent text-sm text-ink-700 placeholder:text-ink-400 focus:outline-none"
                 />
                 {query && (
@@ -344,12 +347,12 @@ export function POSPage() {
             <GlassCard className="p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-display text-sm font-bold text-ink-900">
-                  {query ? `Search results (${displayed.length})` : tabCategories.find((c) => c.id === cat)?.name}
+                  {query ? t('pos.searchResults', { count: String(displayed.length) }) : tabCategories.find((c) => c.id === cat)?.name}
                 </h3>
                 <div className="flex items-center gap-2">
                   {canEditMenu(user?.role) && (
                     <GlassButton variant="glass" size="sm" onClick={() => setShowAddMenuItem((v) => !v)}>
-                      <Plus className="h-3.5 w-3.5" /> Add menu item
+                      <Plus className="h-3.5 w-3.5" /> {t('pos.addMenuItem')}
                     </GlassButton>
                   )}
                 </div>
@@ -374,7 +377,7 @@ export function POSPage() {
               {menuLoading ? (
                 <div className="grid h-32 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-brand-500" /></div>
               ) : displayed.length === 0 ? (
-                <div className="grid h-32 place-items-center text-sm text-ink-400">No items found.</div>
+                <div className="grid h-32 place-items-center text-sm text-ink-400">{t('pos.noItemsFound')}</div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                   {displayed.map((product) => (
@@ -394,13 +397,13 @@ export function POSPage() {
                       {canEditMenu(user?.role) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
-                          className="absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-ink-600 opacity-0 shadow transition-opacity hover:bg-white group-hover:opacity-100"
-                          title="Edit menu item"
+                          className="absolute start-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-ink-600 opacity-0 shadow transition-opacity hover:bg-white group-hover:opacity-100"
+                          title={t('pos.editMenuItem')}
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
                       )}
-                      <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-amber-500 text-white opacity-0 shadow transition-opacity group-hover:opacity-100">
+                      <span className="absolute end-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-amber-500 text-white opacity-0 shadow transition-opacity group-hover:opacity-100">
                         <Plus className="h-3.5 w-3.5" />
                       </span>
                     </div>
@@ -419,12 +422,12 @@ export function POSPage() {
                     <ShoppingCart className="h-4 w-4" />
                   </span>
                   <div>
-                    <h3 className="font-display text-base font-bold text-ink-900">Current Order</h3>
-                    <p className="text-xs text-ink-500">{cart.length} item{cart.length !== 1 ? 's' : ''}</p>
+                    <h3 className="font-display text-base font-bold text-ink-900">{t('pos.currentOrder')}</h3>
+                    <p className="text-xs text-ink-500">{cart.length} {t('pos.items')}</p>
                   </div>
                 </div>
                 {cart.length > 0 && (
-                  <button onClick={() => setCart([])} className="text-xs font-semibold text-rose-500 hover:text-rose-700">Clear</button>
+                  <button onClick={() => setCart([])} className="text-xs font-semibold text-rose-500 hover:text-rose-700">{t('pos.clear')}</button>
                 )}
               </div>
 
@@ -432,7 +435,7 @@ export function POSPage() {
                 <input
                   value={tableNote}
                   onChange={(e) => setTableNote(e.target.value)}
-                  placeholder="Table no. or name (optional)"
+                  placeholder={t('pos.tableNo')}
                   className="w-full rounded-xl border border-white/50 bg-white/40 px-3 py-2 text-xs text-ink-700 placeholder:text-ink-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 />
               </div>
@@ -451,14 +454,14 @@ export function POSPage() {
                           : 'border-white/50 bg-white/40 text-ink-600 hover:bg-white/60',
                       ].join(' ')}
                     >
-                      <Icon className="h-3.5 w-3.5" /> {src}
+                      <Icon className="h-3.5 w-3.5" /> {src === 'Talabat' ? t('pos.talabat') : t('pos.inPerson')}
                     </button>
                   );
                 })}
               </div>
 
               <div className="mt-2">
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-500">Taken by</label>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-500">{t('pos.takenBy')}</label>
                 <div className="flex items-center gap-1.5 rounded-xl border border-white/50 bg-white/40 px-2.5 py-2">
                   <User className="h-3.5 w-3.5 shrink-0 text-ink-400" />
                   <select
@@ -469,7 +472,7 @@ export function POSPage() {
                     {takenByOptions.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.username}
-                        {s.id === user?.id ? ' (me)' : ''}
+                        {s.id === user?.id ? t('pos.me') : ''}
                       </option>
                     ))}
                   </select>
@@ -478,7 +481,7 @@ export function POSPage() {
 
               <div className="no-scrollbar mt-3 flex-1 space-y-2 overflow-y-auto pr-0.5">
                 {cart.length === 0 && (
-                  <div className="grid h-36 place-items-center rounded-2xl border border-dashed border-white/50 text-xs text-ink-400">Tap an item to add it here</div>
+                  <div className="grid h-36 place-items-center rounded-2xl border border-dashed border-white/50 text-xs text-ink-400">{t('pos.tapToAdd')}</div>
                 )}
                 {cart.map((l) => (
                   <div key={l.product.id} className="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/30 p-2.5">
@@ -498,16 +501,16 @@ export function POSPage() {
               </div>
 
               <div className="mt-3 space-y-1.5 border-t border-white/40 pt-3 text-sm">
-                <Row label="Subtotal" value={`OMR ${subtotal.toFixed(3)}`} />
-                <Row label="VAT (5%)" value={`OMR ${vat.toFixed(3)}`} muted />
+                <Row label={t('pos.subtotal')} value={`OMR ${subtotal.toFixed(3)}`} />
+                <Row label={t('pos.vat')} value={`OMR ${vat.toFixed(3)}`} muted />
                 <div className="flex items-center justify-between pt-1">
-                  <span className="font-display text-base font-bold text-ink-900">Total</span>
+                  <span className="font-display text-base font-bold text-ink-900">{t('pos.total')}</span>
                   <span className="font-display text-xl font-extrabold text-amber-700">OMR {total.toFixed(3)}</span>
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-3 gap-1.5">
-                {([{ icon: Banknote, label: 'Cash' }, { icon: CreditCard, label: 'Card' }, { icon: Wallet, label: 'Wallet' }] as const).map((m) => (
+                {([{ icon: Banknote, label: 'Cash' as const, key: 'pos.cash' as const }, { icon: CreditCard, label: 'Card' as const, key: 'pos.card' as const }, { icon: Wallet, label: 'Wallet' as const, key: 'pos.wallet' as const }]).map((m) => (
                   <button
                     key={m.label}
                     onClick={() => setPaymentMethod(m.label)}
@@ -516,17 +519,17 @@ export function POSPage() {
                       paymentMethod === m.label ? 'border-amber-400 bg-amber-50/60 text-amber-700' : 'border-white/50 bg-white/40 text-ink-600 hover:bg-white/60',
                     ].join(' ')}
                   >
-                    <m.icon className="h-4 w-4" /> {m.label}
+                    <m.icon className="h-4 w-4" /> {t(m.key)}
                   </button>
                 ))}
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <GlassButton variant="glass" size="sm" className="w-full" onClick={handlePrintPreview}>
-                  <Printer className="h-3.5 w-3.5" /> Print
+                  <Printer className="h-3.5 w-3.5" /> {t('common.print')}
                 </GlassButton>
                 <GlassButton variant="primary" size="sm" className="w-full !from-amber-500 !to-orange-600" onClick={handleCharge} disabled={charging || cart.length === 0}>
-                  {charging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Charge ${total > 0 ? `OMR ${total.toFixed(3)}` : ''}`}
+                  {charging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `${t('pos.charge')} ${total > 0 ? `OMR ${total.toFixed(3)}` : ''}`}
                 </GlassButton>
               </div>
             </GlassCard>
@@ -550,9 +553,9 @@ export function POSPage() {
                     <GlassCard key={status} hover className="p-4">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${cfg.bg} ${cfg.color}`}>
-                          <Icon className="mr-1 h-3.5 w-3.5" /> {cfg.label}
+                          <Icon className="me-1 h-3.5 w-3.5" /> {t(cfg.labelKey)}
                         </span>
-                        <span className={`ml-auto font-display text-2xl font-black ${cfg.color}`}>{count}</span>
+                        <span className={`ms-auto font-display text-2xl font-black ${cfg.color}`}>{count}</span>
                       </div>
                     </GlassCard>
                   );
@@ -564,14 +567,14 @@ export function POSPage() {
                   <div className="flex items-center gap-3">
                     <span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100/70 text-amber-700"><Store className="h-5 w-5" /></span>
                     <div>
-                      <div className="text-xs text-ink-500">In Person Orders</div>
+                      <div className="text-xs text-ink-500">{t('pos.inPersonOrders')}</div>
                       <div className="font-display text-xl font-bold text-ink-900">{inPersonTotal}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="grid h-11 w-11 place-items-center rounded-2xl bg-rose-100/70 text-rose-700"><Smartphone className="h-5 w-5" /></span>
                     <div>
-                      <div className="text-xs text-ink-500">Talabat Orders</div>
+                      <div className="text-xs text-ink-500">{t('pos.talabatOrders')}</div>
                       <div className="font-display text-xl font-bold text-ink-900">{talabatTotal}</div>
                     </div>
                   </div>
@@ -588,7 +591,7 @@ export function POSPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-display text-base font-black text-ink-900">#{order.id}</span>
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${s.bg} ${s.color}`}>{s.label}</span>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${s.bg} ${s.color}`}>{t(s.labelKey)}</span>
                           </div>
                           <div className="mt-0.5 text-xs text-ink-500">{order.table_number || order.order_type}</div>
                         </div>
@@ -597,14 +600,14 @@ export function POSPage() {
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className={['inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold', order.order_type === 'talabat' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'].join(' ')}>
-                          <SourceIcon className="h-3 w-3" /> {order.order_type === 'talabat' ? 'Talabat' : 'In Person'}
+                          <SourceIcon className="h-3 w-3" /> {order.order_type === 'talabat' ? t('pos.talabat') : t('pos.inPerson')}
                         </span>
                         {order.served_by_username && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-white/50 bg-white/40 px-2 py-0.5 text-[10px] font-semibold text-ink-600">
                             <span className="grid h-4 w-4 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[8px] font-bold text-white">
                               {order.served_by_username[0]?.toUpperCase()}
                             </span>
-                            Taken by {order.served_by_username}
+                            {t('pos.takenByName', { name: order.served_by_username })}
                           </span>
                         )}
                       </div>
@@ -623,10 +626,10 @@ export function POSPage() {
                           disabled={!s.next}
                           className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${s.next ? 'bg-brand-100 text-brand-700 hover:bg-brand-200' : 'bg-ink-50 text-ink-400 cursor-default'}`}
                         >
-                          {s.nextLabel}
+                          {t(s.nextLabelKey)}
                         </button>
                         {user?.role !== 'manager' && (
-                          <button onClick={() => cancelOrder(order)} className="rounded-xl border border-white/50 bg-white/40 px-3 py-2 text-rose-500 hover:bg-rose-50" title="Cancel order">
+                          <button onClick={() => cancelOrder(order)} className="rounded-xl border border-white/50 bg-white/40 px-3 py-2 text-rose-500 hover:bg-rose-50" title={t('pos.cancelOrder')}>
                             <Ban className="h-3.5 w-3.5" />
                           </button>
                         )}
@@ -634,7 +637,7 @@ export function POSPage() {
                     </GlassCard>
                   );
                 })}
-                {activeOrders.length === 0 && <p className="text-sm text-ink-400">No active orders.</p>}
+                {activeOrders.length === 0 && <p className="text-sm text-ink-400">{t('pos.noActiveOrders')}</p>}
               </div>
             </>
           )}
@@ -652,25 +655,25 @@ export function POSPage() {
             <GlassCard hover className="p-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand-100/70 text-brand-700"><CheckCircle2 className="h-5 w-5" /></span>
-                <div><div className="text-xs text-ink-500">Total Orders Served</div><div className="font-display text-xl font-bold text-ink-900">{perfTotals.orders}</div></div>
+                <div><div className="text-xs text-ink-500">{t('pos.totalOrdersServed')}</div><div className="font-display text-xl font-bold text-ink-900">{perfTotals.orders}</div></div>
               </div>
             </GlassCard>
             <GlassCard hover className="p-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100/70 text-amber-700"><TrendingUp className="h-5 w-5" /></span>
-                <div><div className="text-xs text-ink-500">Total Revenue</div><div className="font-display text-xl font-bold text-ink-900">OMR {perfTotals.revenue.toFixed(3)}</div></div>
+                <div><div className="text-xs text-ink-500">{t('pos.totalRevenue')}</div><div className="font-display text-xl font-bold text-ink-900">OMR {perfTotals.revenue.toFixed(3)}</div></div>
               </div>
             </GlassCard>
             <GlassCard hover className="p-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100/70 text-amber-700"><Store className="h-5 w-5" /></span>
-                <div><div className="text-xs text-ink-500">In Person</div><div className="font-display text-xl font-bold text-ink-900">{orders.length - perfTotals.talabat}</div></div>
+                <div><div className="text-xs text-ink-500">{t('pos.inPerson')}</div><div className="font-display text-xl font-bold text-ink-900">{orders.length - perfTotals.talabat}</div></div>
               </div>
             </GlassCard>
             <GlassCard hover className="p-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-rose-100/70 text-rose-700"><Smartphone className="h-5 w-5" /></span>
-                <div><div className="text-xs text-ink-500">Talabat</div><div className="font-display text-xl font-bold text-ink-900">{perfTotals.talabat}</div></div>
+                <div><div className="text-xs text-ink-500">{t('pos.talabat')}</div><div className="font-display text-xl font-bold text-ink-900">{perfTotals.talabat}</div></div>
               </div>
             </GlassCard>
           </div>
@@ -678,8 +681,8 @@ export function POSPage() {
           <GlassCard className="p-5">
             <div className="mb-4 flex items-center gap-2">
               <Users className="h-5 w-5 text-brand-600" />
-              <h3 className="font-display text-base font-bold text-ink-900">Employee Performance</h3>
-              <span className="ml-auto text-xs text-ink-500">Last 30 days</span>
+              <h3 className="font-display text-base font-bold text-ink-900">{t('pos.employeePerformance')}</h3>
+              <span className="ms-auto text-xs text-ink-500">{t('pos.last30Days')}</span>
             </div>
             {perfLoading ? (
               <div className="grid h-32 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-brand-500" /></div>
@@ -695,18 +698,18 @@ export function POSPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-ink-900">{stat.username}</div>
-                      {stat.average_rating != null && <div className="text-xs text-ink-500">★ {stat.average_rating} avg rating</div>}
+                      {stat.average_rating != null && <div className="text-xs text-ink-500">★ {stat.average_rating} {t('pos.avgRating')}</div>}
                     </div>
-                    <div className="flex shrink-0 gap-4 text-right">
-                      <div><div className="font-display text-sm font-bold text-ink-900">{stat.orders_served}</div><div className="text-[10px] text-ink-400">Orders</div></div>
+                    <div className="flex shrink-0 gap-4 text-end">
+                      <div><div className="font-display text-sm font-bold text-ink-900">{stat.orders_served}</div><div className="text-[10px] text-ink-400">{t('pos.ordersLabel')}</div></div>
                       <div><div className="font-display text-sm font-bold text-amber-700">{Number(stat.revenue_generated).toFixed(2)}</div><div className="text-[10px] text-ink-400">OMR</div></div>
                     </div>
                     {idx === 0 && (
-                      <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700"><Award className="h-3 w-3" /> Top</span>
+                      <span className="ms-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700"><Award className="h-3 w-3" /> {t('pos.top')}</span>
                     )}
                   </div>
                 ))}
-                {empStats.length === 0 && <p className="text-sm text-ink-400">No completed orders in this period yet.</p>}
+                {empStats.length === 0 && <p className="text-sm text-ink-400">{t('pos.noCompletedOrders')}</p>}
               </div>
             )}
           </GlassCard>
@@ -739,6 +742,7 @@ function MenuItemForm({
   const [isActive, setIsActive] = useState(product?.is_active ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -750,7 +754,7 @@ function MenuItemForm({
       else await api.post('/inventory/products/', body);
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save menu item.');
+      setError(err instanceof ApiError ? err.message : t('pos.saveMenuItemFailed'));
     } finally {
       setSaving(false);
     }
@@ -758,21 +762,21 @@ function MenuItemForm({
 
   return (
     <form onSubmit={submit} className="mb-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
-      <input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required type="number" step="0.001" placeholder="Price (OMR)" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
+      <input required placeholder={t('pos.name')} value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required type="number" step="0.001" placeholder={t('pos.priceOmr')} value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
       <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2">
-        <option value="">No category</option>
+        <option value="">{t('pos.noCategory')}</option>
         {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
       {product && (
         <label className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm text-ink-700">
-          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> {t('pos.active')}
         </label>
       )}
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : product ? 'Save changes' : 'Add item'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('common.saving') : product ? t('pos.saveChanges') : t('pos.addItem')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
@@ -788,6 +792,7 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
 }
 
 function ReceiptModal({ data, onClose, onPrint }: { data: ReceiptData; onClose: () => void; onPrint: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 p-4 backdrop-blur-sm">
       <div className="glass-strong w-full max-w-sm rounded-3xl p-6 shadow-glass-lg">
@@ -795,7 +800,7 @@ function ReceiptModal({ data, onClose, onPrint }: { data: ReceiptData; onClose: 
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-100 text-amber-700"><Receipt className="h-5 w-5" /></span>
             <div>
-              <h3 className="font-display text-base font-bold text-ink-900">Order Sent</h3>
+              <h3 className="font-display text-base font-bold text-ink-900">{t('pos.orderSent')}</h3>
               <p className="text-xs text-ink-500">{data.orderId} · {data.counter}</p>
             </div>
           </div>
@@ -807,14 +812,14 @@ function ReceiptModal({ data, onClose, onPrint }: { data: ReceiptData; onClose: 
           <span className="text-sm font-semibold text-amber-700">OMR {data.total.toFixed(3)} · {data.paymentMethod}</span>
         </div>
 
-        <div className="mt-4 max-h-[260px] overflow-y-auto rounded-2xl border border-white/40 bg-white p-4 font-mono text-[11px] leading-relaxed text-ink-900">
+        <div dir="ltr" className="mt-4 max-h-[260px] overflow-y-auto rounded-2xl border border-white/40 bg-white p-4 font-mono text-[11px] leading-relaxed text-ink-900">
           <div className="text-center">
             <div className="font-sans text-sm font-black">Share Cafe ☕</div>
             <div className="text-[10px]">Al Saada, Salalah, Oman</div>
           </div>
           <div className="my-2 border-t border-dashed border-ink-300" />
-          <div className="flex justify-between"><span>Invoice</span><span>{data.orderId}</span></div>
-          <div className="flex justify-between"><span>Table</span><span>{data.counter}</span></div>
+          <div className="flex justify-between"><span>{t('receipt.invoice')}</span><span>{data.orderId}</span></div>
+          <div className="flex justify-between"><span>{t('receipt.table')}</span><span>{data.counter}</span></div>
           <div className="my-2 border-t border-dashed border-ink-300" />
           {data.lines.map((l, i) => (
             <div key={i} className="mb-1 flex justify-between">
@@ -823,16 +828,16 @@ function ReceiptModal({ data, onClose, onPrint }: { data: ReceiptData; onClose: 
             </div>
           ))}
           <div className="my-2 border-t border-solid border-ink-400" />
-          <div className="flex justify-between"><span>Subtotal</span><span>OMR {data.subtotal.toFixed(3)}</span></div>
+          <div className="flex justify-between"><span>{t('pos.subtotal')}</span><span>OMR {data.subtotal.toFixed(3)}</span></div>
           <div className="flex justify-between"><span>VAT (5%)</span><span>OMR {data.vat.toFixed(3)}</span></div>
-          <div className="mt-1 flex justify-between text-sm font-black"><span>TOTAL</span><span>OMR {data.total.toFixed(3)}</span></div>
+          <div className="mt-1 flex justify-between text-sm font-black"><span>{t('common.total').toUpperCase()}</span><span>OMR {data.total.toFixed(3)}</span></div>
           <div className="my-2 border-t border-dashed border-ink-300" />
           <div className="text-center font-bold">{data.paymentMethod.toUpperCase()}</div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <GlassButton variant="glass" size="md" className="w-full" onClick={onClose}>Close</GlassButton>
-          <GlassButton variant="primary" size="md" className="w-full" onClick={onPrint}><Printer className="h-4 w-4" /> Print receipt</GlassButton>
+          <GlassButton variant="glass" size="md" className="w-full" onClick={onClose}>{t('common.close')}</GlassButton>
+          <GlassButton variant="primary" size="md" className="w-full" onClick={onPrint}><Printer className="h-4 w-4" /> {t('pos.printReceipt')}</GlassButton>
         </div>
       </div>
     </div>

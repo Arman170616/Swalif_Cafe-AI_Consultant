@@ -14,6 +14,14 @@ import {
 } from 'lucide-react';
 import { GlassCard, Badge } from '../../ui';
 import { api } from '../../../lib/api';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { TranslationKey } from '../../../lib/translations';
+
+const PAYMENT_METHOD_KEY: Record<string, TranslationKey> = {
+  cash: 'paymentMethod.cash',
+  card: 'paymentMethod.card',
+  mobile: 'paymentMethod.mobile',
+};
 
 type RangeKey = 'daily' | 'monthly' | 'yearly';
 type CatKey = 'sales' | 'expenses' | 'profit' | 'inventory' | 'vat' | 'cashflow';
@@ -53,16 +61,18 @@ function kpiRangeStart(range: RangeKey) {
   return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
 }
 
-const categories: { key: CatKey; label: string; icon: typeof DollarSign; desc: string }[] = [
-  { key: 'sales', label: 'Sales', icon: DollarSign, desc: 'Revenue trend & best sellers' },
-  { key: 'expenses', label: 'Expenses', icon: TrendingDown, desc: 'Cost breakdown by category' },
-  { key: 'profit', label: 'Profit', icon: Wallet, desc: 'Revenue, COGS & margins' },
-  { key: 'inventory', label: 'Inventory', icon: Boxes, desc: 'Stock value & low-stock items' },
-  { key: 'vat', label: 'VAT', icon: Receipt, desc: '5% VAT collected by period' },
-  { key: 'cashflow', label: 'Cash Flow', icon: Activity, desc: 'Payments received by method' },
+const categoryDefs: { key: CatKey; labelKey: TranslationKey; icon: typeof DollarSign; descKey: TranslationKey }[] = [
+  { key: 'sales', labelKey: 'reports.cat.sales', icon: DollarSign, descKey: 'reports.cat.salesDesc' },
+  { key: 'expenses', labelKey: 'reports.cat.expenses', icon: TrendingDown, descKey: 'reports.cat.expensesDesc' },
+  { key: 'profit', labelKey: 'reports.cat.profit', icon: Wallet, descKey: 'reports.cat.profitDesc' },
+  { key: 'inventory', labelKey: 'reports.cat.inventory', icon: Boxes, descKey: 'reports.cat.inventoryDesc' },
+  { key: 'vat', labelKey: 'reports.cat.vat', icon: Receipt, descKey: 'reports.cat.vatDesc' },
+  { key: 'cashflow', labelKey: 'reports.cat.cashflow', icon: Activity, descKey: 'reports.cat.cashflowDesc' },
 ];
 
 export function ReportsPage() {
+  const { t } = useLanguage();
+  const categories = categoryDefs.map((c) => ({ ...c, label: t(c.labelKey), desc: t(c.descKey) }));
   const [range, setRange] = useState<RangeKey>('monthly');
   const [cat, setCat] = useState<CatKey>('sales');
   const [loading, setLoading] = useState(true);
@@ -106,27 +116,27 @@ export function ReportsPage() {
     if (!rp) return [];
     if (range === 'daily') {
       return [
-        { label: 'Sales Today', value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-        { label: 'Expenses Today', value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-        { label: 'Profit Today', value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-        { label: 'Transactions', value: String(ordersCount), icon: Activity },
+        { label: t('reports.salesToday'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
+        { label: t('reports.expensesToday'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
+        { label: t('reports.profitToday'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
+        { label: t('reports.transactions'), value: String(ordersCount), icon: Activity },
       ];
     }
     if (range === 'monthly') {
       return [
-        { label: 'Sales (MTD)', value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-        { label: 'Expenses (MTD)', value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-        { label: 'Net Profit', value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-        { label: 'VAT Collected', value: `OMR ${kpiTax.toFixed(2)}`, icon: Receipt },
+        { label: t('reports.salesMtd'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
+        { label: t('reports.expensesMtd'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
+        { label: t('reports.netProfit'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
+        { label: t('reports.vatCollected'), value: `OMR ${kpiTax.toFixed(2)}`, icon: Receipt },
       ];
     }
     return [
-      { label: 'Sales (YTD)', value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-      { label: 'Expenses (YTD)', value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-      { label: 'Net Profit (YTD)', value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-      { label: 'Inventory Value', value: `OMR ${Number(overview?.inventory_value ?? 0).toFixed(0)}`, icon: Boxes },
+      { label: t('reports.salesYtd'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
+      { label: t('reports.expensesYtd'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
+      { label: t('reports.netProfitYtd'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
+      { label: t('dash.inventoryValue'), value: `OMR ${Number(overview?.inventory_value ?? 0).toFixed(0)}`, icon: Boxes },
     ];
-  }, [rp, range, ordersCount, kpiTax, overview]);
+  }, [rp, range, ordersCount, kpiTax, overview, t]);
 
   const expenseByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -145,7 +155,7 @@ export function ReportsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-brand-600" />
-          <span className="font-display text-base font-bold text-ink-900">Reporting Period</span>
+          <span className="font-display text-base font-bold text-ink-900">{t('reports.reportingPeriod')}</span>
         </div>
         <div className="flex gap-1 rounded-2xl bg-white/40 p-1">
           {(['daily', 'monthly', 'yearly'] as const).map((r) => (
@@ -154,7 +164,7 @@ export function ReportsPage() {
               onClick={() => setRange(r)}
               className={['rounded-xl px-4 py-1.5 text-sm font-semibold capitalize transition-all', range === r ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60'].join(' ')}
             >
-              {r}
+              {t(`reports.${r}` as TranslationKey)}
             </button>
           ))}
         </div>
@@ -176,15 +186,15 @@ export function ReportsPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <GlassCard className="p-5 lg:col-span-2">
           <div>
-            <h3 className="font-display text-base font-bold text-ink-900">Sales Trend</h3>
-            <p className="text-xs text-ink-500 capitalize">{range} revenue</p>
+            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.salesTrend')}</h3>
+            <p className="text-xs text-ink-500 capitalize">{t('reports.revenueOf', { range: t(`reports.${range}` as TranslationKey) })}</p>
           </div>
-          <MiniBarChart data={sales.map((b) => Number(b.revenue))} labels={sales.map((b) => formatPeriodLabel(b.period, range))} />
+          <MiniBarChart data={sales.map((b) => Number(b.revenue))} labels={sales.map((b) => formatPeriodLabel(b.period, range))} noDataLabel={t('reports.noDataPeriod')} />
         </GlassCard>
 
         <GlassCard className="p-5">
-          <h3 className="font-display text-base font-bold text-ink-900">Report Category</h3>
-          <p className="text-xs text-ink-500">Pick a domain</p>
+          <h3 className="font-display text-base font-bold text-ink-900">{t('reports.reportCategory')}</h3>
+          <p className="text-xs text-ink-500">{t('reports.pickDomain')}</p>
           <div className="mt-4 space-y-2">
             {categories.map((c) => {
               const Icon = c.icon;
@@ -212,7 +222,7 @@ export function ReportsPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <GlassCard className="p-5 lg:col-span-2">
-          <h3 className="font-display text-base font-bold text-ink-900">{categories.find((c) => c.key === cat)?.label} detail</h3>
+          <h3 className="font-display text-base font-bold text-ink-900">{t('reports.detail', { category: categories.find((c) => c.key === cat)?.label ?? '' })}</h3>
           <div className="mt-4">
             <CategoryDetail cat={cat} rp={rp} expenseByCategory={expenseByCategory} cashflow={cashflow} lowStock={lowStock} bestSellers={bestSellers} sales={sales} />
           </div>
@@ -220,10 +230,10 @@ export function ReportsPage() {
 
         <GlassCard className="p-5">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-base font-bold text-ink-900">Top Selling Products</h3>
-            <Badge tone="brand"><PieChart className="h-3 w-3" /> Top 5</Badge>
+            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.topSellingProducts')}</h3>
+            <Badge tone="brand"><PieChart className="h-3 w-3" /> {t('reports.top5')}</Badge>
           </div>
-          <p className="mt-0.5 text-xs text-ink-500">By quantity · this period</p>
+          <p className="mt-0.5 text-xs text-ink-500">{t('reports.byQuantity')}</p>
           <div className="mt-4 space-y-3">
             {bestSellers.map((b) => {
               const max = bestSellers[0]?.quantity_sold || 1;
@@ -231,7 +241,7 @@ export function ReportsPage() {
                 <div key={b.product__id}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="font-medium text-ink-700">{b.product__name}</span>
-                    <span className="font-semibold text-ink-900">{b.quantity_sold} sold</span>
+                    <span className="font-semibold text-ink-900">{b.quantity_sold} {t('reports.sold')}</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/50">
                     <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-700" style={{ width: `${(b.quantity_sold / max) * 100}%` }} />
@@ -239,7 +249,7 @@ export function ReportsPage() {
                 </div>
               );
             })}
-            {bestSellers.length === 0 && <p className="text-sm text-ink-400">No sales in this period yet.</p>}
+            {bestSellers.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesPeriod')}</p>}
           </div>
         </GlassCard>
       </div>
@@ -247,8 +257,8 @@ export function ReportsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <GlassCard className="p-5">
           <div>
-            <h3 className="font-display text-base font-bold text-ink-900">Expense Breakdown</h3>
-            <p className="text-xs text-ink-500">Where money went · all recorded expenses</p>
+            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.expenseBreakdown')}</h3>
+            <p className="text-xs text-ink-500">{t('reports.whereMoneyWent')}</p>
           </div>
           <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-white/50">
             {expenseByCategory.map((e) => <div key={e.label} className={`h-full bg-gradient-to-r ${e.color}`} style={{ width: `${e.pct}%` }} title={`${e.label} · ${e.pct.toFixed(1)}%`} />)}
@@ -258,25 +268,24 @@ export function ReportsPage() {
               <div key={e.label} className="rounded-xl border border-white/40 bg-white/30 p-3">
                 <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${e.color}`} /><span className="text-xs font-semibold text-ink-700">{e.label}</span></div>
                 <div className="mt-1.5 font-display text-base font-bold text-ink-900">OMR {e.value.toLocaleString()}</div>
-                <div className="text-[10px] text-ink-400">{e.pct.toFixed(1)}% of total</div>
+                <div className="text-[10px] text-ink-400">{t('reports.pctOfTotal', { pct: e.pct.toFixed(1) })}</div>
               </div>
             ))}
-            {expenseByCategory.length === 0 && <p className="col-span-full text-sm text-ink-400">No expenses recorded yet.</p>}
+            {expenseByCategory.length === 0 && <p className="col-span-full text-sm text-ink-400">{t('reports.noExpensesYet')}</p>}
           </div>
         </GlassCard>
 
         <GlassCard className="p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-display text-base font-bold text-ink-900">Named report exports</h3>
-              <p className="text-xs text-ink-500">Not available in this build</p>
+              <h3 className="font-display text-base font-bold text-ink-900">{t('reports.namedExports')}</h3>
+              <p className="text-xs text-ink-500">{t('acc.notAvailable')}</p>
             </div>
           </div>
           <div className="mt-4 rounded-2xl border border-brand-200/50 bg-brand-50/50 p-4">
-            <div className="flex items-center gap-2"><Badge tone="neutral"><Star className="h-3 w-3" /> Not built</Badge></div>
+            <div className="flex items-center gap-2"><Badge tone="neutral"><Star className="h-3 w-3" /> {t('reports.notBuilt')}</Badge></div>
             <p className="mt-2 text-xs leading-relaxed text-ink-600">
-              Named PDF/XLSX exports (P&L statement, VAT return filing, etc.) aren't generated by this system yet.
-              Every number on this page is live from the backend — use it directly instead of a downloaded file.
+              {t('reports.namedExportsDesc')}
             </p>
           </div>
         </GlassCard>
@@ -294,13 +303,14 @@ function CategoryDetail({ cat, rp, expenseByCategory, cashflow, lowStock, bestSe
   bestSellers: BestSeller[];
   sales: SalesBucket[];
 }) {
+  const { t } = useLanguage();
   if (cat === 'sales') {
     return (
       <div className="space-y-2">
         {bestSellers.map((b) => (
-          <Row key={b.product__id} label={b.product__name} value={`${b.quantity_sold} sold · OMR ${Number(b.revenue).toFixed(2)}`} />
+          <Row key={b.product__id} label={b.product__name} value={`${b.quantity_sold} ${t('reports.sold')} · OMR ${Number(b.revenue).toFixed(2)}`} />
         ))}
-        {bestSellers.length === 0 && <p className="text-sm text-ink-400">No sales yet.</p>}
+        {bestSellers.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesYet')}</p>}
       </div>
     );
   }
@@ -308,25 +318,25 @@ function CategoryDetail({ cat, rp, expenseByCategory, cashflow, lowStock, bestSe
     return (
       <div className="space-y-2">
         {expenseByCategory.map((e) => <Row key={e.label} label={e.label} value={`OMR ${e.value.toFixed(2)} (${e.pct.toFixed(1)}%)`} />)}
-        {expenseByCategory.length === 0 && <p className="text-sm text-ink-400">No expenses recorded yet.</p>}
+        {expenseByCategory.length === 0 && <p className="text-sm text-ink-400">{t('reports.noExpensesYet')}</p>}
       </div>
     );
   }
   if (cat === 'profit' && rp) {
     return (
       <div className="space-y-2">
-        <Row label="Gross revenue" value={`OMR ${Number(rp.gross_revenue).toFixed(2)}`} />
-        <Row label="Cost of goods sold" value={`OMR ${Number(rp.cost_of_goods_sold).toFixed(2)}`} />
-        <Row label="Expenses" value={`OMR ${Number(rp.expenses).toFixed(2)}`} />
-        <Row label="Net profit" value={`OMR ${Number(rp.net_profit).toFixed(2)}`} bold />
+        <Row label={t('reports.grossRevenue')} value={`OMR ${Number(rp.gross_revenue).toFixed(2)}`} />
+        <Row label={t('reports.cogs')} value={`OMR ${Number(rp.cost_of_goods_sold).toFixed(2)}`} />
+        <Row label={t('acc.expenses')} value={`OMR ${Number(rp.expenses).toFixed(2)}`} />
+        <Row label={t('reports.netProfitRow')} value={`OMR ${Number(rp.net_profit).toFixed(2)}`} bold />
       </div>
     );
   }
   if (cat === 'inventory') {
     return (
       <div className="space-y-2">
-        {lowStock.map((i) => <Row key={i.id} label={i.name} value={`${Number(i.quantity_on_hand).toFixed(1)} / reorder ${Number(i.reorder_threshold).toFixed(1)} ${i.unit}`} />)}
-        {lowStock.length === 0 && <p className="text-sm text-ink-400">Nothing low on stock right now.</p>}
+        {lowStock.map((i) => <Row key={i.id} label={i.name} value={`${Number(i.quantity_on_hand).toFixed(1)} / ${t('inv.reorderThreshold')} ${Number(i.reorder_threshold).toFixed(1)} ${i.unit}`} />)}
+        {lowStock.length === 0 && <p className="text-sm text-ink-400">{t('reports.nothingLowStock')}</p>}
       </div>
     );
   }
@@ -334,15 +344,15 @@ function CategoryDetail({ cat, rp, expenseByCategory, cashflow, lowStock, bestSe
     return (
       <div className="space-y-2">
         {sales.map((b) => <Row key={b.period} label={formatPeriodLabel(b.period, 'monthly')} value={`OMR ${Number(b.tax_collected).toFixed(3)} VAT`} />)}
-        {sales.length === 0 && <p className="text-sm text-ink-400">No sales yet.</p>}
+        {sales.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesYet')}</p>}
       </div>
     );
   }
   if (cat === 'cashflow') {
     return (
       <div className="space-y-2">
-        {cashflow.map((c) => <Row key={c.method} label={c.method} value={`OMR ${Number(c.total).toFixed(2)} (${c.count} payments)`} />)}
-        {cashflow.length === 0 && <p className="text-sm text-ink-400">No payments in this period.</p>}
+        {cashflow.map((c) => <Row key={c.method} label={PAYMENT_METHOD_KEY[c.method] ? t(PAYMENT_METHOD_KEY[c.method]) : c.method} value={`OMR ${Number(c.total).toFixed(2)} (${t('reports.paymentsCount', { n: String(c.count) })})`} />)}
+        {cashflow.length === 0 && <p className="text-sm text-ink-400">{t('reports.noPaymentsPeriod')}</p>}
       </div>
     );
   }
@@ -358,7 +368,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   );
 }
 
-function MiniBarChart({ data, labels }: { data: number[]; labels: string[] }) {
+function MiniBarChart({ data, labels, noDataLabel }: { data: number[]; labels: string[]; noDataLabel: string }) {
   const max = Math.max(...data, 1);
   const [hover, setHover] = useState<number | null>(null);
   return (
@@ -378,7 +388,7 @@ function MiniBarChart({ data, labels }: { data: number[]; labels: string[] }) {
             </div>
           );
         })}
-        {data.length === 0 && <p className="w-full text-center text-sm text-ink-400">No data in this period.</p>}
+        {data.length === 0 && <p className="w-full text-center text-sm text-ink-400">{noDataLabel}</p>}
       </div>
       <div className="mt-2 flex gap-2">
         {labels.map((l, i) => <div key={i} className="flex-1 text-center text-[10px] font-medium text-ink-400">{l}</div>)}

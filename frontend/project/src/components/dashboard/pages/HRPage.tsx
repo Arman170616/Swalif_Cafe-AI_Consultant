@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { GlassCard, GlassButton } from '../../ui';
 import { api, ApiError, downloadFile } from '../../../lib/api';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { TranslationKey } from '../../../lib/translations';
 
 /* ─── API types ──────────────────────────────────────────────────────────── */
 
@@ -33,6 +35,7 @@ function unwrap<T>(res: { results?: T[] } | T[]): T[] {
 }
 
 export function HRPage() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'employees' | 'attendance' | 'payroll' | 'leave'>('employees');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -116,10 +119,10 @@ export function HRPage() {
   const openLeaves = leaveRequests.filter((l) => l.status === 'pending').length;
 
   const kpis = [
-    { label: 'Total Employees', value: String(employees.length), icon: Users, sub: `${employees.filter((e) => e.is_active).length} active` },
-    { label: 'Monthly Payroll', value: `OMR ${monthlyPayroll.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign, sub: payrollIsEstimate ? 'estimated from base salaries' : 'from generated payslips' },
-    { label: 'Avg Attendance', value: avgAttendance != null ? `${avgAttendance}%` : '—', icon: UserCheck, sub: 'all-time, per employee' },
-    { label: 'Open Leaves', value: String(openLeaves), icon: Calendar, sub: 'pending approval' },
+    { label: t('hr.totalEmployees'), value: String(employees.length), icon: Users, sub: t('hr.activeCount', { n: String(employees.filter((e) => e.is_active).length) }) },
+    { label: t('hr.monthlyPayroll'), value: `OMR ${monthlyPayroll.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: DollarSign, sub: payrollIsEstimate ? t('hr.estimatedFromSalaries') : t('hr.fromGeneratedPayslips') },
+    { label: t('hr.avgAttendance'), value: avgAttendance != null ? `${avgAttendance}%` : '—', icon: UserCheck, sub: t('hr.allTimePerEmployee') },
+    { label: t('hr.openLeaves'), value: String(openLeaves), icon: Calendar, sub: t('hr.pendingApprovalSub') },
   ];
 
   async function approveLeave(id: number) {
@@ -132,12 +135,12 @@ export function HRPage() {
   }
 
   async function deleteEmployee(employee: Employee) {
-    if (!window.confirm(`Remove ${employee.full_name || employee.username} from HR? Their attendance, leave and payslip history go with them, and their login is deactivated (so they also disappear from the POS "Taken by" list). This can be undone in the Django admin if needed.`)) return;
+    if (!window.confirm(t('hr.deleteEmployeeConfirm', { name: employee.full_name || employee.username }))) return;
     try {
       await api.delete(`/hr/employees/${employee.id}/`);
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to delete employee.');
+      alert(err instanceof ApiError ? err.message : t('hr.deleteEmployeeFailed'));
     }
   }
 
@@ -155,7 +158,7 @@ export function HRPage() {
       await api.post(`/hr/attendance/${id}/approve/`);
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to approve attendance.');
+      alert(err instanceof ApiError ? err.message : t('hr.approveAttendanceFailed'));
     }
   }
   async function rejectAttendance(id: number) {
@@ -163,7 +166,7 @@ export function HRPage() {
       await api.post(`/hr/attendance/${id}/reject/`);
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : 'Failed to reject attendance.');
+      alert(err instanceof ApiError ? err.message : t('hr.rejectAttendanceFailed'));
     }
   }
 
@@ -198,7 +201,7 @@ export function HRPage() {
                   onClick={() => setActiveTab(tab)}
                   className={['rounded-xl px-4 py-1.5 text-sm font-semibold transition-all capitalize', activeTab === tab ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60'].join(' ')}
                 >
-                  {tab === 'leave' ? 'Leave' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {t(`hr.${tab}` as TranslationKey)}
                 </button>
               ))}
             </div>
@@ -213,7 +216,7 @@ export function HRPage() {
                 }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                {activeTab === 'employees' ? 'Add employee' : activeTab === 'payroll' ? 'Generate payslip' : 'New request'}
+                {activeTab === 'employees' ? t('hr.addEmployee') : activeTab === 'payroll' ? t('hr.generatePayslip') : t('hr.newRequest')}
               </GlassButton>
             )}
           </div>
@@ -233,14 +236,14 @@ export function HRPage() {
 
           {activeTab === 'employees' && (
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[640px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Employee</th>
-                    <th className="pb-3 font-semibold">Position</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <SortTh label="Salary" field="salary" active={sortField} dir={sortDir} onToggle={toggleSort} />
-                    <SortTh label="Attendance" field="attendance" active={sortField} dir={sortDir} onToggle={toggleSort} />
+                    <th className="pb-3 font-semibold">{t('hr.employee')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.position')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status')}</th>
+                    <SortTh label={t('hr.salary')} field="salary" active={sortField} dir={sortDir} onToggle={toggleSort} />
+                    <SortTh label={t('hr.attendanceCol')} field="attendance" active={sortField} dir={sortDir} onToggle={toggleSort} />
                     <th className="pb-3"></th>
                   </tr>
                 </thead>
@@ -255,30 +258,30 @@ export function HRPage() {
                           <div>
                             <div className="font-semibold text-ink-900">{e.full_name || e.username}</div>
                             <div className="text-[11px] text-ink-400">{e.position}</div>
-                            <div className="font-mono text-[10px] text-ink-300" title="Last known login IP">
-                              {e.ip_address ?? 'Never logged in'}
+                            <div className="font-mono text-[10px] text-ink-300" title={t('hr.lastLoginIp')}>
+                              {e.ip_address ?? t('hr.neverLoggedIn')}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 text-sm text-ink-600">{e.position}</td>
                       <td className="py-3"><StatusPill active={e.is_active} /></td>
-                      <td className="py-3 text-right font-medium text-ink-900">OMR {Number(e.base_salary).toLocaleString()}</td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end font-medium text-ink-900">OMR {Number(e.base_salary).toLocaleString()}</td>
+                      <td className="py-3 text-end">
                         <AttendanceBar pct={attendancePctByEmployee.get(e.id) ?? null} />
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setEditingEmployee(e)}
-                            title="Edit"
+                            title={t('common.edit')}
                             className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-white/60 hover:text-ink-700"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => deleteEmployee(e)}
-                            title="Delete"
+                            title={t('common.delete')}
                             className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -287,7 +290,7 @@ export function HRPage() {
                       </td>
                     </tr>
                   ))}
-                  {sorted.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">No employees yet.</td></tr>}
+                  {sorted.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">{t('hr.noEmployeesYet')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -296,17 +299,17 @@ export function HRPage() {
           {activeTab === 'attendance' && (
             <div className="mt-5 overflow-x-auto">
               <p className="mb-3 text-xs text-ink-500">
-                {today} · employees check themselves in/out from their own HR page — accept or decline what they submit here
-                {pendingCount > 0 && <span className="ml-2 rounded-full bg-amber-100/70 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{pendingCount} pending</span>}
+                {t('hr.attendanceExplainer', { date: today })}
+                {pendingCount > 0 && <span className="ms-2 rounded-full bg-amber-100/70 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t('hr.pendingBadge', { n: String(pendingCount) })}</span>}
               </p>
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Employee</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold">Check-in</th>
-                    <th className="pb-3 font-semibold">Check-out</th>
-                    <th className="pb-3 font-semibold">Approval</th>
+                    <th className="pb-3 font-semibold">{t('hr.employee')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.checkInCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.checkOutCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.approvalCol')}</th>
                     <th className="pb-3"></th>
                   </tr>
                 </thead>
@@ -316,25 +319,25 @@ export function HRPage() {
                     return (
                       <tr key={e.id} className="transition-colors hover:bg-white/30">
                         <td className="py-3 font-semibold text-ink-900">{e.full_name || e.username}</td>
-                        <td className="py-3">{record ? <AttendanceStatusPill status={record.status} /> : <span className="text-xs text-ink-400">Not marked</span>}</td>
+                        <td className="py-3">{record ? <AttendanceStatusPill status={record.status} /> : <span className="text-xs text-ink-400">{t('hr.notMarked')}</span>}</td>
                         <td className="py-3 text-ink-600">{record?.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                         <td className="py-3 text-ink-600">{record?.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                         <td className="py-3">{record ? <ApprovalStatusPill status={record.approval_status} /> : <span className="text-xs text-ink-300">—</span>}</td>
-                        <td className="py-3 text-right">
+                        <td className="py-3 text-end">
                           {record?.approval_status === 'pending' && (
                             <div className="flex justify-end gap-1.5">
-                              <button onClick={() => approveAttendance(record.id)} className="rounded-lg bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-200">Accept</button>
-                              <button onClick={() => rejectAttendance(record.id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-200">Decline</button>
+                              <button onClick={() => approveAttendance(record.id)} className="rounded-lg bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-200">{t('common.accept')}</button>
+                              <button onClick={() => rejectAttendance(record.id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-200">{t('common.decline')}</button>
                             </div>
                           )}
                           {record?.approval_status === 'approved' && record.check_out && (
-                            <span className="text-xs text-ink-400">Completed · {record.hours_worked}h</span>
+                            <span className="text-xs text-ink-400">{t('hr.completedHours', { hours: String(record.hours_worked) })}</span>
                           )}
                         </td>
                       </tr>
                     );
                   })}
-                  {employees.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">No employees yet.</td></tr>}
+                  {employees.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">{t('hr.noEmployeesYet')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -342,14 +345,14 @@ export function HRPage() {
 
           {activeTab === 'payroll' && (
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[620px] text-left text-sm">
+              <table className="w-full min-w-[620px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Employee</th>
-                    <th className="pb-3 font-semibold">Period</th>
-                    <th className="pb-3 text-right font-semibold">Base</th>
-                    <th className="pb-3 text-right font-semibold">Overtime</th>
-                    <th className="pb-3 text-right font-semibold">Net</th>
+                    <th className="pb-3 font-semibold">{t('hr.employee')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.periodCol')}</th>
+                    <th className="pb-3 text-end font-semibold">{t('hr.baseCol')}</th>
+                    <th className="pb-3 text-end font-semibold">{t('hr.overtimeCol')}</th>
+                    <th className="pb-3 text-end font-semibold">{t('hr.netCol')}</th>
                     <th className="pb-3"></th>
                   </tr>
                 </thead>
@@ -358,17 +361,17 @@ export function HRPage() {
                     <tr key={p.id} className="transition-colors hover:bg-white/30">
                       <td className="py-3 font-semibold text-ink-900">{p.employee_name}</td>
                       <td className="py-3 text-ink-600">{p.period_start} → {p.period_end}</td>
-                      <td className="py-3 text-right text-ink-600">OMR {Number(p.base_salary).toFixed(2)}</td>
-                      <td className="py-3 text-right text-ink-600">OMR {Number(p.overtime_amount).toFixed(2)}</td>
-                      <td className="py-3 text-right font-semibold text-brand-700">OMR {Number(p.net_salary).toFixed(2)}</td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end text-ink-600">OMR {Number(p.base_salary).toFixed(2)}</td>
+                      <td className="py-3 text-end text-ink-600">OMR {Number(p.overtime_amount).toFixed(2)}</td>
+                      <td className="py-3 text-end font-semibold text-brand-700">OMR {Number(p.net_salary).toFixed(2)}</td>
+                      <td className="py-3 text-end">
                         <button onClick={() => downloadFile(`/payroll/payslips/${p.id}/pdf/`, `payslip-${p.id}.pdf`)} className="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-white/60 hover:text-ink-700">
                           <Download className="h-4 w-4" />
                         </button>
                       </td>
                     </tr>
                   ))}
-                  {payslips.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">No payslips generated yet.</td></tr>}
+                  {payslips.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">{t('hr.noPayslipsYet')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -376,14 +379,14 @@ export function HRPage() {
 
           {activeTab === 'leave' && (
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[580px] text-left text-sm">
+              <table className="w-full min-w-[580px] text-start text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wider text-ink-400">
-                    <th className="pb-3 font-semibold">Employee</th>
-                    <th className="pb-3 font-semibold">Type</th>
-                    <th className="pb-3 font-semibold">From</th>
-                    <th className="pb-3 font-semibold">To</th>
-                    <th className="pb-3 font-semibold">Status</th>
+                    <th className="pb-3 font-semibold">{t('hr.employee')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.typeCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.fromCol')}</th>
+                    <th className="pb-3 font-semibold">{t('hr.toCol')}</th>
+                    <th className="pb-3 font-semibold">{t('common.status')}</th>
                     <th className="pb-3" />
                   </tr>
                 </thead>
@@ -391,21 +394,21 @@ export function HRPage() {
                   {leaveRequests.map((l) => (
                     <tr key={l.id} className="transition-colors hover:bg-white/30">
                       <td className="py-3 font-semibold text-ink-900">{l.employee_name}</td>
-                      <td className="py-3 text-ink-600 capitalize">{l.leave_type}</td>
+                      <td className="py-3 text-ink-600 capitalize">{t(`hr.leaveType.${l.leave_type}` as TranslationKey)}</td>
                       <td className="py-3 text-ink-600">{l.start_date}</td>
                       <td className="py-3 text-ink-600">{l.end_date}</td>
                       <td className="py-3"><LeaveStatusPill status={l.status} /></td>
                       <td className="py-3">
                         {l.status === 'pending' && (
                           <div className="flex gap-1.5">
-                            <button onClick={() => approveLeave(l.id)} className="rounded-lg bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-200 transition-colors">Approve</button>
-                            <button onClick={() => rejectLeave(l.id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-200 transition-colors">Deny</button>
+                            <button onClick={() => approveLeave(l.id)} className="rounded-lg bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-200 transition-colors">{t('common.approve')}</button>
+                            <button onClick={() => rejectLeave(l.id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-200 transition-colors">{t('hr.deny')}</button>
                           </div>
                         )}
                       </td>
                     </tr>
                   ))}
-                  {leaveRequests.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">No leave requests.</td></tr>}
+                  {leaveRequests.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-sm text-ink-400">{t('hr.noLeaveRequests')}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -415,15 +418,15 @@ export function HRPage() {
       <GlassCard className="p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-display text-base font-bold text-ink-900">Today's Attendance</h3>
+            <h3 className="font-display text-base font-bold text-ink-900">{t('hr.todaysAttendance')}</h3>
             <p className="text-xs text-ink-500">{today}</p>
           </div>
         </div>
           <div className="mt-5 grid grid-cols-3 gap-3">
             {[
-              { label: 'Present', value: presentToday, icon: CheckCircle, color: 'text-brand-600', bg: 'bg-brand-100/70' },
-              { label: 'Absent', value: absentToday, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-100/70' },
-              { label: 'On Leave', value: onLeaveToday, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-100/70' },
+              { label: t('hr.present'), value: presentToday, icon: CheckCircle, color: 'text-brand-600', bg: 'bg-brand-100/70' },
+              { label: t('hr.absent'), value: absentToday, icon: XCircle, color: 'text-rose-500', bg: 'bg-rose-100/70' },
+              { label: t('hr.onLeave'), value: onLeaveToday, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-100/70' },
             ].map((s) => {
               const Icon = s.icon;
               return (
@@ -437,8 +440,8 @@ export function HRPage() {
           </div>
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between text-xs text-ink-500">
-              <span>Attendance rate</span>
-              <span className="font-bold text-brand-600">{attendanceRate != null ? `${attendanceRate}%` : 'No records today'}</span>
+              <span>{t('hr.attendanceRate')}</span>
+              <span className="font-bold text-brand-600">{attendanceRate != null ? `${attendanceRate}%` : t('hr.noRecordsToday')}</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-white/50">
               <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600" style={{ width: `${attendanceRate ?? 0}%` }} />
@@ -452,6 +455,7 @@ export function HRPage() {
 /* ─── inline forms ────────────────────────────────────────────────────────── */
 
 function AddEmployeeForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [position, setPosition] = useState('');
@@ -469,7 +473,7 @@ function AddEmployeeForm({ onSaved, onCancel }: { onSaved: () => void; onCancel:
       await api.post('/hr/employees/', { user: user.id, position, hire_date: hireDate, base_salary: salary });
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to add employee.');
+      setError(err instanceof ApiError ? err.message : t('hr.addEmployeeFailed'));
     } finally {
       setSaving(false);
     }
@@ -477,21 +481,22 @@ function AddEmployeeForm({ onSaved, onCancel }: { onSaved: () => void; onCancel:
 
   return (
     <form onSubmit={submit} className="mt-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
-      <input required placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required type="password" placeholder="Temp password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required placeholder="Position" value={position} onChange={(e) => setPosition(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required placeholder={t('auth.username')} value={username} onChange={(e) => setUsername(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required type="password" placeholder={t('hr.tempPassword')} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required placeholder={t('hr.position')} value={position} onChange={(e) => setPosition(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
-      <input required type="number" step="0.001" placeholder="Base salary (OMR)" value={salary} onChange={(e) => setSalary(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
+      <input required type="number" step="0.001" placeholder={t('hr.baseSalaryOmr')} value={salary} onChange={(e) => setSalary(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : 'Save'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
 }
 
 function EditEmployeeForm({ employee, onSaved, onCancel }: { employee: Employee; onSaved: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   const [position, setPosition] = useState(employee.position);
   const [hireDate, setHireDate] = useState(employee.hire_date);
   const [salary, setSalary] = useState(employee.base_salary);
@@ -507,7 +512,7 @@ function EditEmployeeForm({ employee, onSaved, onCancel }: { employee: Employee;
       await api.patch(`/hr/employees/${employee.id}/`, { position, hire_date: hireDate, base_salary: salary, is_active: isActive });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update employee.');
+      setError(err instanceof ApiError ? err.message : t('hr.updateEmployeeFailed'));
     } finally {
       setSaving(false);
     }
@@ -516,22 +521,23 @@ function EditEmployeeForm({ employee, onSaved, onCancel }: { employee: Employee;
   return (
     <form onSubmit={submit} className="mt-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
       <div className="flex items-center rounded-xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-ink-500 sm:col-span-2">{employee.full_name || employee.username}</div>
-      <input required placeholder="Position" value={position} onChange={(e) => setPosition(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required placeholder={t('hr.position')} value={position} onChange={(e) => setPosition(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required type="number" step="0.001" placeholder="Base salary (OMR)" value={salary} onChange={(e) => setSalary(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
+      <input required type="number" step="0.001" placeholder={t('hr.baseSalaryOmr')} value={salary} onChange={(e) => setSalary(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
       <label className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm text-ink-700 sm:col-span-3">
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active
+        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> {t('common.active')}
       </label>
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('common.saving') : t('pos.saveChanges')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
 }
 
 function GeneratePayslipForm({ employees, onSaved, onCancel }: { employees: Employee[]; onSaved: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   const [employee, setEmployee] = useState(employees[0]?.id ?? 0);
   const [periodStart, setPeriodStart] = useState(new Date(new Date().setDate(1)).toISOString().slice(0, 10));
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
@@ -548,7 +554,7 @@ function GeneratePayslipForm({ employees, onSaved, onCancel }: { employees: Empl
       await api.post('/payroll/payslips/', { employee, period_start: periodStart, period_end: periodEnd, bonus, deductions });
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to generate payslip.');
+      setError(err instanceof ApiError ? err.message : t('hr.generatePayslipFailed'));
     } finally {
       setSaving(false);
     }
@@ -561,18 +567,19 @@ function GeneratePayslipForm({ employees, onSaved, onCancel }: { employees: Empl
       </select>
       <input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input type="number" step="0.001" placeholder="Bonus" value={bonus} onChange={(e) => setBonus(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
-      <input type="number" step="0.001" placeholder="Deductions" value={deductions} onChange={(e) => setDeductions(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
+      <input type="number" step="0.001" placeholder={t('hr.bonus')} value={bonus} onChange={(e) => setBonus(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
+      <input type="number" step="0.001" placeholder={t('hr.deductions')} value={deductions} onChange={(e) => setDeductions(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-3" />
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving || !employee}>{saving ? 'Generating…' : 'Generate'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving || !employee}>{saving ? t('hr.generating') : t('hr.generate')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
 }
 
 function NewLeaveForm({ employees, onSaved, onCancel }: { employees: Employee[]; onSaved: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   const [employee, setEmployee] = useState(employees[0]?.id ?? 0);
   const [leaveType, setLeaveType] = useState('annual');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
@@ -589,7 +596,7 @@ function NewLeaveForm({ employees, onSaved, onCancel }: { employees: Employee[];
       await api.post('/hr/leave/', { employee, leave_type: leaveType, start_date: startDate, end_date: endDate, reason });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit leave request.');
+      setError(err instanceof ApiError ? err.message : t('hr.submitLeaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -601,18 +608,18 @@ function NewLeaveForm({ employees, onSaved, onCancel }: { employees: Employee[];
         {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.username}</option>)}
       </select>
       <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2">
-        <option value="annual">Annual</option>
-        <option value="sick">Sick</option>
-        <option value="unpaid">Unpaid</option>
-        <option value="other">Other</option>
+        <option value="annual">{t('hr.leaveType.annual')}</option>
+        <option value="sick">{t('hr.leaveType.sick')}</option>
+        <option value="unpaid">{t('hr.leaveType.unpaid')}</option>
+        <option value="other">{t('hr.leaveType.other')}</option>
       </select>
       <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-4" />
+      <input placeholder={t('hr.reasonOptional')} value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-4" />
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving || !employee}>{saving ? 'Saving…' : 'Submit'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving || !employee}>{saving ? t('common.saving') : t('hr.submit')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );
@@ -623,7 +630,7 @@ function NewLeaveForm({ employees, onSaved, onCancel }: { employees: Employee[];
 function SortTh({ label, field, active, dir, onToggle }: { label: string; field: SortField; active: SortField; dir: SortDir; onToggle: (f: SortField) => void }) {
   const isActive = active === field;
   return (
-    <th className="cursor-pointer pb-3 text-right font-semibold select-none" onClick={() => onToggle(field)}>
+    <th className="cursor-pointer pb-3 text-end font-semibold select-none" onClick={() => onToggle(field)}>
       <span className="inline-flex items-center justify-end gap-1">
         {label}
         {isActive ? (dir === 'asc' ? <ChevronUp className="h-3 w-3 text-brand-600" /> : <ChevronDown className="h-3 w-3 text-brand-600" />) : <ChevronUp className="h-3 w-3 text-ink-300" />}
@@ -633,51 +640,55 @@ function SortTh({ label, field, active, dir, onToggle }: { label: string; field:
 }
 
 function StatusPill({ active }: { active: boolean }) {
+  const { t } = useLanguage();
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${active ? 'bg-brand-100/70 text-brand-700 border-brand-200/60' : 'bg-rose-100/70 text-rose-600 border-rose-200/60'}`}>
-      {active ? 'Active' : 'Inactive'}
+      {active ? t('common.active') : t('common.inactive')}
     </span>
   );
 }
 
 function LeaveStatusPill({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, string> = {
     approved: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
     pending: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
     rejected: 'bg-rose-100/70 text-rose-600 border-rose-200/60',
   };
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{t(`hr.status.${status}` as TranslationKey)}</span>;
 }
 
 function AttendanceStatusPill({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, string> = {
     present: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
     late: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
     absent: 'bg-rose-100/70 text-rose-600 border-rose-200/60',
     on_leave: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
   };
-  const label = status === 'on_leave' ? 'On leave' : status.charAt(0).toUpperCase() + status.slice(1);
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${map[status] ?? map.present}`}>{label}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${map[status] ?? map.present}`}>{t(`hr.attStatus.${status}` as TranslationKey)}</span>;
 }
 
 function ApprovalStatusPill({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, string> = {
     approved: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
     pending: 'bg-amber-100/70 text-amber-700 border-amber-200/60',
     rejected: 'bg-rose-100/70 text-rose-600 border-rose-200/60',
   };
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${map[status] ?? map.pending}`}>{t(`hr.status.${status}` as TranslationKey)}</span>;
 }
 
 function AttendanceBar({ pct }: { pct: number | null }) {
-  if (pct == null) return <span className="text-xs text-ink-400">No records</span>;
+  const { t } = useLanguage();
+  if (pct == null) return <span className="text-xs text-ink-400">{t('hr.noRecords')}</span>;
   const color = pct >= 90 ? 'from-brand-400 to-brand-600' : pct >= 70 ? 'from-amber-400 to-amber-600' : 'from-rose-400 to-rose-600';
   return (
     <div className="flex items-center justify-end gap-2">
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/50">
         <div className={`h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-8 text-right text-xs font-semibold text-ink-700">{pct}%</span>
+      <span className="w-8 text-end text-xs font-semibold text-ink-700">{pct}%</span>
     </div>
   );
 }

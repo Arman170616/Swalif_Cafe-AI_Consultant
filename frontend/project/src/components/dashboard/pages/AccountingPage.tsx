@@ -1,8 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Wallet, TrendingUp, TrendingDown, Landmark, Scale, FileText, Plus, Trash2, Loader2 } from 'lucide-react';
 import { GlassCard, Badge, GlassButton } from '../../ui';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { TranslationKey } from '../../../lib/translations';
+
+const PAYMENT_METHOD_KEY: Record<string, TranslationKey> = {
+  cash: 'paymentMethod.cash',
+  card: 'paymentMethod.card',
+  mobile: 'paymentMethod.mobile',
+};
 
 type RevenueProfit = { gross_revenue: string; expenses: string; net_profit: string };
 type CashflowRow = { method: string; total: string; count: number };
@@ -15,6 +23,7 @@ function unwrap<T>(res: { results?: T[] } | T[]): T[] {
 
 export function AccountingPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   // Manager gets read-only visibility into Accounting for oversight; only Admin can
   // add/delete expenses, matching the backend's ReadWriteRolePermission on ExpenseViewSet.
   const canEdit = user?.role === 'admin';
@@ -46,7 +55,7 @@ export function AccountingPage() {
   useEffect(load, []);
 
   async function deleteExpense(id: number) {
-    if (!window.confirm('Delete this expense?')) return;
+    if (!window.confirm(t('acc.deleteExpenseConfirm'))) return;
     await api.delete(`/analytics/expenses/${id}/`);
     load();
   }
@@ -58,10 +67,10 @@ export function AccountingPage() {
   }
 
   const kpis = [
-    { label: 'Revenue (this month)', value: `OMR ${Number(rp.gross_revenue).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: TrendingUp },
-    { label: 'Expenses (this month)', value: `OMR ${Number(rp.expenses).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: TrendingDown },
-    { label: 'Net Profit (this month)', value: `OMR ${Number(rp.net_profit).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Wallet },
-    { label: 'Cash collected (this month)', value: `OMR ${cashCollected.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Landmark },
+    { label: t('acc.revenueThisMonth'), value: `OMR ${Number(rp.gross_revenue).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: TrendingUp },
+    { label: t('acc.expensesThisMonth'), value: `OMR ${Number(rp.expenses).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: TrendingDown },
+    { label: t('acc.netProfitThisMonth'), value: `OMR ${Number(rp.net_profit).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Wallet },
+    { label: t('acc.cashCollected'), value: `OMR ${cashCollected.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Landmark },
   ];
 
   return (
@@ -86,12 +95,12 @@ export function AccountingPage() {
         <GlassCard className="p-5 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-display text-base font-bold text-ink-900">Expenses</h3>
-              <p className="text-xs text-ink-500">Feeds "Net Profit" above · SRS expense analysis</p>
+              <h3 className="font-display text-base font-bold text-ink-900">{t('acc.expenses')}</h3>
+              <p className="text-xs text-ink-500">{t('acc.feedsNetProfit')}</p>
             </div>
             {canEdit && (
               <GlassButton variant="primary" size="sm" onClick={() => setShowAddExpense((v) => !v)}>
-                <Plus className="h-3.5 w-3.5" /> Add expense
+                <Plus className="h-3.5 w-3.5" /> {t('acc.addExpense')}
               </GlassButton>
             )}
           </div>
@@ -99,13 +108,13 @@ export function AccountingPage() {
           {canEdit && showAddExpense && <AddExpenseForm onSaved={() => { setShowAddExpense(false); load(); }} onCancel={() => setShowAddExpense(false)} />}
 
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
                 <tr className="text-xs uppercase tracking-wider text-ink-400">
-                  <th className="pb-3 font-semibold">Date</th>
-                  <th className="pb-3 font-semibold">Category</th>
-                  <th className="pb-3 font-semibold">Note</th>
-                  <th className="pb-3 text-right font-semibold">Amount</th>
+                  <th className="pb-3 font-semibold">{t('acc.date')}</th>
+                  <th className="pb-3 font-semibold">{t('acc.category')}</th>
+                  <th className="pb-3 font-semibold">{t('acc.note')}</th>
+                  <th className="pb-3 text-end font-semibold">{t('acc.amount')}</th>
                   {canEdit && <th className="pb-3"></th>}
                 </tr>
               </thead>
@@ -115,9 +124,9 @@ export function AccountingPage() {
                     <td className="py-3 text-ink-600">{e.date}</td>
                     <td className="py-3"><TypePill category={e.category} /></td>
                     <td className="py-3 text-ink-600">{e.note || '—'}</td>
-                    <td className="py-3 text-right font-semibold text-ink-900">OMR {Number(e.amount).toFixed(3)}</td>
+                    <td className="py-3 text-end font-semibold text-ink-900">OMR {Number(e.amount).toFixed(3)}</td>
                     {canEdit && (
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-end">
                         <button onClick={() => deleteExpense(e.id)} className="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -125,7 +134,7 @@ export function AccountingPage() {
                     )}
                   </tr>
                 ))}
-                {expenses.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="py-6 text-center text-sm text-ink-400">No expenses recorded yet.</td></tr>}
+                {expenses.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="py-6 text-center text-sm text-ink-400">{t('acc.noExpensesYet')}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -133,38 +142,36 @@ export function AccountingPage() {
 
         {/* Statements — no PDF/statement generator exists, so these are honestly disabled */}
         <GlassCard className="p-5">
-          <h3 className="font-display text-base font-bold text-ink-900">Statements</h3>
-          <p className="text-xs text-ink-500">Not available in this build</p>
+          <h3 className="font-display text-base font-bold text-ink-900">{t('acc.statements')}</h3>
+          <p className="text-xs text-ink-500">{t('acc.notAvailable')}</p>
           <div className="mt-4 space-y-2.5">
             {[
-              { name: 'Profit & Loss', desc: 'Income vs expenses', icon: TrendingUp },
-              { name: 'Balance Sheet', desc: 'Assets, liabilities, equity', icon: Scale },
-              { name: 'Cash Flow', desc: 'Operating, investing, financing', icon: Wallet },
-              { name: 'Trial Balance', desc: 'All accounts, debits & credits', icon: FileText },
+              { nameKey: 'acc.profitLoss' as const, descKey: 'acc.profitLossDesc' as const, icon: TrendingUp },
+              { nameKey: 'acc.balanceSheet' as const, descKey: 'acc.balanceSheetDesc' as const, icon: Scale },
+              { nameKey: 'acc.cashFlow' as const, descKey: 'acc.cashFlowDesc' as const, icon: Wallet },
+              { nameKey: 'acc.trialBalance' as const, descKey: 'acc.trialBalanceDesc' as const, icon: FileText },
             ].map((s) => {
               const Icon = s.icon;
               return (
                 <button
-                  key={s.name}
+                  key={s.nameKey}
                   disabled
-                  title="Statement generation isn't built yet — use the Reports page for real revenue/expense/VAT numbers."
-                  className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl border border-white/40 bg-white/20 p-3 text-left opacity-60"
+                  title={t('acc.statementsUnavailable')}
+                  className="flex w-full cursor-not-allowed items-center gap-3 rounded-2xl border border-white/40 bg-white/20 p-3 text-start opacity-60"
                 >
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-ink-300 to-ink-400 text-white"><Icon className="h-5 w-5" /></span>
                   <div className="flex-1">
-                    <div className="text-sm font-semibold text-ink-700">{s.name}</div>
-                    <div className="text-xs text-ink-500">{s.desc}</div>
+                    <div className="text-sm font-semibold text-ink-700">{t(s.nameKey)}</div>
+                    <div className="text-xs text-ink-500">{t(s.descKey)}</div>
                   </div>
                 </button>
               );
             })}
           </div>
           <div className="mt-4 rounded-2xl border border-brand-200/50 bg-brand-50/50 p-4">
-            <div className="flex items-center gap-2"><Badge tone="brand">Real data</Badge></div>
+            <div className="flex items-center gap-2"><Badge tone="brand">{t('acc.realData')}</Badge></div>
             <p className="mt-2 text-xs leading-relaxed text-ink-600">
-              The KPIs above and Expenses ledger are live from the backend. Formal financial statements (P&L,
-              balance sheet) aren't part of this system's scope yet — see the Reports page for detailed real
-              breakdowns instead.
+              {t('acc.realDataDesc')}
             </p>
           </div>
         </GlassCard>
@@ -172,29 +179,29 @@ export function AccountingPage() {
 
       <GlassCard className="p-5">
         <div>
-          <h3 className="font-display text-base font-bold text-ink-900">Recent payments</h3>
-          <p className="text-xs text-ink-500">Latest POS payments received</p>
+          <h3 className="font-display text-base font-bold text-ink-900">{t('acc.recentPayments')}</h3>
+          <p className="text-xs text-ink-500">{t('acc.latestPayments')}</p>
         </div>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[560px] text-start text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-ink-400">
-                <th className="pb-3 font-semibold">Payment</th>
-                <th className="pb-3 font-semibold">Order</th>
-                <th className="pb-3 font-semibold">Method</th>
-                <th className="pb-3 text-right font-semibold">Amount</th>
+                <th className="pb-3 font-semibold">{t('acc.payment')}</th>
+                <th className="pb-3 font-semibold">{t('acc.order')}</th>
+                <th className="pb-3 font-semibold">{t('acc.method')}</th>
+                <th className="pb-3 text-end font-semibold">{t('acc.amount')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/40">
               {payments.map((p) => (
                 <tr key={p.id} className="transition-colors hover:bg-white/30">
                   <td className="py-3 font-mono text-xs text-ink-500">#{p.id}</td>
-                  <td className="py-3 text-ink-600">Order #{p.order}</td>
-                  <td className="py-3 capitalize text-ink-600">{p.method}</td>
-                  <td className="py-3 text-right font-semibold text-ink-900">OMR {Number(p.amount).toFixed(3)}</td>
+                  <td className="py-3 text-ink-600">{t('acc.order')} #{p.order}</td>
+                  <td className="py-3 capitalize text-ink-600">{PAYMENT_METHOD_KEY[p.method] ? t(PAYMENT_METHOD_KEY[p.method]) : p.method}</td>
+                  <td className="py-3 text-end font-semibold text-ink-900">OMR {Number(p.amount).toFixed(3)}</td>
                 </tr>
               ))}
-              {payments.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-sm text-ink-400">No payments yet.</td></tr>}
+              {payments.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-sm text-ink-400">{t('acc.noPaymentsYet')}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -210,6 +217,7 @@ function AddExpenseForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: 
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -219,7 +227,7 @@ function AddExpenseForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: 
       await api.post('/analytics/expenses/', { category, amount, date, note });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add expense.');
+      setError(err instanceof ApiError ? err.message : t('acc.addExpenseFailed'));
     } finally {
       setSaving(false);
     }
@@ -227,14 +235,14 @@ function AddExpenseForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: 
 
   return (
     <form onSubmit={submit} className="mt-4 grid gap-3 rounded-2xl border border-white/50 bg-white/40 p-4 sm:grid-cols-6">
-      <input required placeholder="Category (e.g. Rent, Utilities)" value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
-      <input required type="number" step="0.001" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
+      <input required placeholder={t('acc.categoryPlaceholder')} value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input required type="number" step="0.001" placeholder={t('acc.amount')} value={amount} onChange={(e) => setAmount(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
       <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm" />
-      <input placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
+      <input placeholder={t('acc.notePlaceholder')} value={note} onChange={(e) => setNote(e.target.value)} className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm sm:col-span-2" />
       {error && <p className="sm:col-span-6 text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2 sm:col-span-6">
-        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? 'Saving…' : 'Save'}</GlassButton>
-        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" variant="primary" size="sm" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</GlassButton>
+        <GlassButton type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</GlassButton>
       </div>
     </form>
   );

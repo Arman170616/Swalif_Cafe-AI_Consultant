@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent, type InputHTMLAttributes } from 'r
 import { Loader2 } from 'lucide-react';
 import { MeshBackground } from '../../components/MeshBackground';
 import { BrandMark } from '../../components/BrandMark';
+import { LanguageSwitch } from '../../components/LanguageSwitch';
 import { Badge, GlassButton, GlassCard } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 
 function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
@@ -20,6 +22,7 @@ function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTML
 
 export function AuthPage() {
   const { login, signup } = useAuth();
+  const { t } = useLanguage();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
@@ -59,6 +62,9 @@ export function AuthPage() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <MeshBackground />
       <div className="relative w-full max-w-md">
+        <div className="mb-4 flex justify-end">
+          <LanguageSwitch />
+        </div>
 
         <GlassCard variant="strong" sheen className="p-8">
           <div className="mb-6 flex items-center gap-2.5">
@@ -73,22 +79,20 @@ export function AuthPage() {
 
           {needsSetup && (
             <Badge tone="accent" className="mb-4">
-              First-time setup
+              {t('auth.firstTimeSetup')}
             </Badge>
           )}
 
           <h1 className="font-display text-2xl font-bold text-ink-900">
-            {mode === 'signup' ? 'Create the owner account' : 'Welcome back'}
+            {mode === 'signup' ? t('auth.createOwnerAccount') : t('auth.welcomeBack')}
           </h1>
           <p className="mt-1.5 text-sm text-ink-500">
-            {mode === 'signup'
-              ? "This runs once, for a brand-new Share Cafe deployment — it creates the Admin account. Every other login afterward is provisioned by an admin."
-              : "Sign in with the account your admin set up for you."}
+            {mode === 'signup' ? t('auth.createAdminSubtitle') : t('auth.welcomeBackSubtitle')}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Field
-              label="Username"
+              label={t('auth.username')}
               name="username"
               autoComplete="username"
               required
@@ -97,7 +101,7 @@ export function AuthPage() {
             />
             {mode === 'signup' && (
               <Field
-                label="Email (optional)"
+                label={t('auth.email')}
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -106,7 +110,7 @@ export function AuthPage() {
               />
             )}
             <Field
-              label="Password"
+              label={t('auth.password')}
               name="password"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -126,16 +130,16 @@ export function AuthPage() {
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : mode === 'signup' ? (
-                'Create admin account'
+                t('auth.createAdminAccount')
               ) : (
-                'Sign in'
+                t('auth.signIn')
               )}
             </GlassButton>
           </form>
 
           {needsSetup === false && mode === 'login' && (
             <p className="mt-5 text-center text-xs text-ink-500">
-              Don't have an account? Ask your cafe's admin to create one for you.
+              {t('auth.noAccount')}
             </p>
           )}
         </GlassCard>

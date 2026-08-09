@@ -13,19 +13,22 @@ import { HelpPage } from './components/dashboard/pages/HelpPage';
 import { AuthPage } from './pages/auth/AuthPage';
 import { RequireRole } from './components/RequireRole';
 import { useAuth } from './contexts/AuthContext';
+import { useLanguage } from './contexts/LanguageContext';
+import type { TranslationKey } from './lib/translations';
 
-const meta: Record<NavKey, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: 'Real-time overview of your cafe' },
-  pos: { title: 'Sales & POS', subtitle: 'Process sales, returns and refunds' },
-  inventory: { title: 'Inventory', subtitle: 'Products, ingredients and stock' },
-  accounting: { title: 'Accounting', subtitle: 'Revenue, expenses and financial summary' },
-  hr: { title: 'HR & Payroll', subtitle: 'Employees, attendance and payroll' },
-  reports: { title: 'Reports', subtitle: 'Financial and operational reports' },
-  help: { title: 'Help & Support', subtitle: 'Get in touch with the Share Cafe team' },
+const meta: Record<NavKey, { titleKey: TranslationKey; subtitleKey: TranslationKey }> = {
+  dashboard: { titleKey: 'title.dashboard', subtitleKey: 'subtitle.dashboard' },
+  pos: { titleKey: 'title.pos', subtitleKey: 'subtitle.pos' },
+  inventory: { titleKey: 'title.inventory', subtitleKey: 'subtitle.inventory' },
+  accounting: { titleKey: 'title.accounting', subtitleKey: 'subtitle.accounting' },
+  hr: { titleKey: 'title.hr', subtitleKey: 'subtitle.hr' },
+  reports: { titleKey: 'title.reports', subtitleKey: 'subtitle.reports' },
+  help: { titleKey: 'title.help', subtitleKey: 'subtitle.help' },
 };
 
 function App() {
   const { user, loading } = useAuth();
+  const { t } = useLanguage();
   const [active, setActive] = useState<NavKey>('dashboard');
 
   useEffect(() => {
@@ -48,7 +51,7 @@ function App() {
 
   const m = meta[active];
   return (
-    <DashboardLayout active={active} onNavigate={setActive} title={m.title} subtitle={m.subtitle}>
+    <DashboardLayout active={active} onNavigate={setActive} title={t(m.titleKey)} subtitle={t(m.subtitleKey)}>
       {active === 'dashboard' && (
         <RequireRole roles={['admin', 'manager']}>
           <OverviewPage onViewReports={() => setActive('reports')} />
