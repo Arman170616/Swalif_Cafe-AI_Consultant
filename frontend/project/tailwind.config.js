@@ -4,8 +4,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'Cairo', 'system-ui', 'sans-serif'],
+        // Cairo is the project-wide Arabic typeface
+        arabic: ['Cairo', 'system-ui', 'sans-serif'],
+        display: ['Sora', 'Inter', 'Cairo', 'system-ui', 'sans-serif'],
       },
       colors: {
         ink: {

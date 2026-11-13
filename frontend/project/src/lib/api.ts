@@ -132,6 +132,22 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** GET every page of a DRF-paginated list (PAGE_SIZE is 25 server-side), so callers
+   * that need the whole collection — e.g. the POS menu — don't silently get page 1 only.
+   * Also accepts an unpaginated plain-array response. */
+  getAll: async <T>(path: string, params?: Params): Promise<T[]> => {
+    const all: T[] = [];
+    for (let page = 1; page < 200; page++) {
+      const res = await request<{ results?: T[]; next?: string | null } | T[]>(path, {
+        method: 'GET',
+        params: { ...params, page },
+      });
+      if (Array.isArray(res)) return res;
+      all.push(...(res.results ?? []));
+      if (!res.next) break;
+    }
+    return all;
+  },
 };
 
 /** Downloads a binary response (PDF invoices/payslips) and saves it via the browser. */

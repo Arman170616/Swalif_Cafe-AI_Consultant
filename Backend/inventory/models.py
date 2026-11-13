@@ -4,10 +4,12 @@ from django.db import models
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    # Display order on the menu/POS (follows the printed menu); new categories go last.
+    position = models.PositiveIntegerField(default=1000)
 
     class Meta:
         verbose_name_plural = "categories"
-        ordering = ["name"]
+        ordering = ["position", "name"]
 
     def __str__(self):
         return self.name
@@ -24,10 +26,12 @@ class Product(models.Model):
     cost_price = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    # Display order within its category (follows the printed menu); new items go last.
+    position = models.PositiveIntegerField(default=1000)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["category__position", "position", "name"]
 
     def __str__(self):
         return self.name

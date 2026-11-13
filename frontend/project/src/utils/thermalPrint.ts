@@ -44,12 +44,13 @@ export function printThermalReceipt(data: ReceiptData): void {
 <head>
   <meta charset="UTF-8" />
   <title>Receipt ${data.orderId}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet" />
   <style>
     /* ── Reset & base ── */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Courier New', Courier, 'Cairo', monospace;
       font-size: 12px;
       color: #000;
       background: #fff;
@@ -64,7 +65,7 @@ export function printThermalReceipt(data: ReceiptData): void {
     .header .logo {
       font-size: 22px;
       font-weight: 900;
-      font-family: Arial, sans-serif;
+      font-family: Arial, 'Cairo', sans-serif;
       letter-spacing: -0.5px;
     }
     .header .logo span { /* dot */ }
@@ -137,7 +138,7 @@ export function printThermalReceipt(data: ReceiptData): void {
     .footer .thank-you {
       font-size: 13px;
       font-weight: 900;
-      font-family: Arial, sans-serif;
+      font-family: Arial, 'Cairo', sans-serif;
       color: #000;
       margin-bottom: 3px;
     }
@@ -245,7 +246,8 @@ export function printThermalReceipt(data: ReceiptData): void {
 
   <script>
     window.onload = function () {
-      window.print();
+      // wait for the Cairo web font so Arabic text isn't printed in a fallback font
+      (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { window.print(); });
       // close the window after print dialog is dismissed
       window.onafterprint = function () { window.close(); };
     };

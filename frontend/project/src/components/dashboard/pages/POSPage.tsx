@@ -25,9 +25,11 @@ import {
   User,
   Loader2,
   Ban,
-  Pencil,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { GlassCard, GlassButton } from '../../ui';
+import { MenuItems, splitName, useLocalName, type MenuView } from './MenuItems';
 import { printThermalReceipt, type ReceiptData } from '../../../utils/thermalPrint';
 import { api, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -87,6 +89,23 @@ export function POSPage() {
   const [menuLoading, setMenuLoading] = useState(true);
   const [cat, setCat] = useState('__all__');
   const [query, setQuery] = useState('');
+  const localName = useLocalName();
+  // Grid vs list layout for the menu — a per-device preference, so remember it locally.
+  const [menuView, setMenuView] = useState<MenuView>(() => {
+    try {
+      return localStorage.getItem('posMenuView') === 'list' ? 'list' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+  const changeMenuView = (v: MenuView) => {
+    setMenuView(v);
+    try {
+      localStorage.setItem('posMenuView', v);
+    } catch {
+      /* storage unavailable — keep the in-memory choice */
+    }
+  };
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [servedBy, setServedBy] = useState<number | null>(null);
@@ -115,12 +134,13 @@ export function POSPage() {
   const loadMenu = () => {
     setMenuLoading(true);
     Promise.all([
-      api.get<{ results?: Category[] } | Category[]>('/inventory/categories/'),
-      api.get<{ results?: Product[] } | Product[]>('/inventory/products/', { is_active: true }),
+      // getAll: the API pages at 25, and the menu has 100+ items
+      api.getAll<Category>('/inventory/categories/'),
+      api.getAll<Product>('/inventory/products/', { is_active: true }),
     ])
       .then(([c, p]) => {
-        setCategories(Array.isArray(c) ? c : c.results ?? []);
-        setProducts(Array.isArray(p) ? p : p.results ?? []);
+        setCategories(c);
+        setProducts(p);
       })
       .finally(() => setMenuLoading(false));
   };
@@ -168,7 +188,8 @@ export function POSPage() {
   }, [activeTab, canSeePerformance]);
 
   const tabCategories = useMemo(
-    () => [{ id: '__all__', name: t('pos.all') }, ...categories.map((c) => ({ id: String(c.id), name: c.name }))],
+    () => [{ id: '__all__', name: t('pos.all') }, ...categories.map((c) => ({ id: String(c.id), name: localName(c.name) }))],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- localName only changes with lang, which t tracks
     [categories, t]
   );
 
@@ -177,6 +198,8 @@ export function POSPage() {
     : cat === '__all__'
     ? products
     : products.filter((p) => String(p.category) === cat);
+
+  const cartQty = useMemo(() => Object.fromEntries(cart.map((l) => [l.product.id, l.qty])), [cart]);
 
   const add = (product: Product) => {
     setCart((c) => {
@@ -305,7 +328,7 @@ export function POSPage() {
             <span className="sm:hidden">Salalah, Oman</span>
             <span className="hidden sm:inline">Swalif Cafe</span>
           </span>
-          <span className="hidden text-xs text-ink-500 sm:inline">· Al Saada, Salalah, Oman</span>
+          <span className="hidden text-xs text-ink-500 sm:inline">· Al Saadah, Salalah, Oman</span>
         </div>
       </div>
 
@@ -350,6 +373,22 @@ export function POSPage() {
                   {query ? t('pos.searchResults', { count: String(displayed.length) }) : tabCategories.find((c) => c.id === cat)?.name}
                 </h3>
                 <div className="flex items-center gap-2">
+                  <div className="flex rounded-full border border-white/50 bg-white/40 p-0.5">
+                    {([['grid', LayoutGrid, 'pos.viewGrid'], ['list', List, 'pos.viewList']] as const).map(([v, Icon, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => changeMenuView(v)}
+                        title={t(label)}
+                        aria-pressed={menuView === v}
+                        className={[
+                          'grid h-7 w-7 place-items-center rounded-full transition-colors',
+                          menuView === v ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:bg-white/70',
+                        ].join(' ')}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </button>
+                    ))}
+                  </div>
                   {canEditMenu(user?.role) && (
                     <GlassButton variant="glass" size="sm" onClick={() => setShowAddMenuItem((v) => !v)}>
                       <Plus className="h-3.5 w-3.5" /> {t('pos.addMenuItem')}
@@ -381,36 +420,16 @@ export function POSPage() {
               ) : displayed.length === 0 ? (
                 <div className="grid h-32 place-items-center text-sm text-ink-400">{t('pos.noItemsFound')}</div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                  {displayed.map((product) => (
-                    <div
-                      key={product.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => add(product)}
-                      onKeyDown={(e) => e.key === 'Enter' && add(product)}
-                      className="group relative flex flex-col rounded-2xl border border-white/50 bg-white/40 p-3 text-left transition-all duration-300 hover:-translate-y-1 hover:border-brand-300 hover:bg-white/60 hover:shadow-glass cursor-pointer"
-                    >
-                      <div className="grid h-16 w-full place-items-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 text-2xl font-bold text-amber-700">
-                        {product.name[0]}
-                      </div>
-                      <div className="mt-2 text-xs font-semibold leading-tight text-ink-900 line-clamp-2">{product.name}</div>
-                      <div className="mt-1 font-display text-sm font-bold text-amber-700">OMR {Number(product.price).toFixed(3)}</div>
-                      {canEditMenu(user?.role) && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
-                          className="absolute start-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-ink-600 opacity-0 shadow transition-opacity hover:bg-white group-hover:opacity-100"
-                          title={t('pos.editMenuItem')}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      )}
-                      <span className="absolute end-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-amber-500 text-white opacity-0 shadow transition-opacity group-hover:opacity-100">
-                        <Plus className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <MenuItems
+                  products={displayed}
+                  categories={categories}
+                  grouped={!query && cat === '__all__'}
+                  view={menuView}
+                  canEdit={canEditMenu(user?.role)}
+                  cartQty={cartQty}
+                  onAdd={add}
+                  onEdit={setEditingProduct}
+                />
               )}
             </GlassCard>
           </div>
@@ -487,9 +506,12 @@ export function POSPage() {
                 )}
                 {cart.map((l) => (
                   <div key={l.product.id} className="flex items-center gap-2 rounded-2xl border border-white/40 bg-white/30 p-2.5">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-sm font-bold text-amber-700">{l.product.name[0]}</div>
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-sm font-bold text-amber-700">{localName(l.product.name)[0]}</div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-semibold text-ink-900">{l.product.name}</div>
+                      <div className="truncate text-xs font-semibold text-ink-900">
+                        {localName(l.product.name)}
+                        {splitName(l.product.name).size && ` (${splitName(l.product.name).size})`}
+                      </div>
                       <div className="text-[10px] text-ink-500">OMR {Number(l.product.price).toFixed(3)}</div>
                     </div>
                     <div className="flex items-center gap-1">

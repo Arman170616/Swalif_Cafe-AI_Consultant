@@ -6,7 +6,7 @@ from .models import Category, Ingredient, Product, ProductIngredient, StockMovem
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ["id", "name"]
+        fields = ["id", "name", "position"]
 
 
 class ProductIngredientSerializer(serializers.ModelSerializer):
@@ -32,6 +32,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "cost_price",
             "description",
             "is_active",
+            "position",
             "recipe_lines",
             "created_at",
         ]

@@ -14,17 +14,18 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Cairo', system-ui, sans-serif;
   color: rgb(var(--ink));
   background: #eef2f8;
   overflow-x: hidden;
 }
 
-/* Arabic (RTL): swap in a proper Arabic typeface everywhere — Inter/Sora have no real
-   Arabic glyph coverage, they'd fall back to an ugly system font otherwise. */
+/* Arabic (RTL): Cairo is the project-wide Arabic typeface. In LTR it's also listed as the
+   fallback after Inter/Sora (which have no Arabic glyphs), so stray Arabic text in English
+   mode — the language toggle, slogan, customer names — still renders in Cairo. */
 html[dir='rtl'] body,
 html[dir='rtl'] .font-display {
-  font-family: 'Tajawal', 'Inter', system-ui, sans-serif;
+  font-family: 'Cairo', 'Inter', system-ui, sans-serif;
 }
 
 ::selection {
