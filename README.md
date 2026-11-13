@@ -2,6 +2,28 @@
 
 A cloud-based management system built for **Swalif Cafe** (Al Saadah, Salalah, Oman) — everything needed to run the cafe day to day, in one place: sales, inventory, staff, customers, and reporting. Available in **English and Arabic**, with full right-to-left support.
 
+## Login page
+
+![Swalif Cafe login page](docs/screenshots/login-en.png)
+
+The sign-in screen pairs a simple login form with a photo of the cafe's interior, the Swalif slogan (*كل لحظة حكاية، وكل قهوة عالم*), its location and its opening hours (8:00 AM – 3:00 AM).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/login-menu.png" alt="Menu popup"></td>
+    <td width="50%"><img src="docs/screenshots/login-ar.png" alt="Login page in Arabic"></td>
+  </tr>
+  <tr>
+    <td><b>القائمة | MENU</b> — the button in the top bar opens the full cafe menu as a book that opens right-to-left like the printed menu. Flip pages with the arrows, the keyboard or by tapping a page.</td>
+    <td><b>Arabic</b> — the whole page, login form included, switches to Arabic with a right-to-left layout in the Cairo typeface.</td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/login-mobile.png" alt="Login page on a phone" width="300"><br>
+  <sub>On phones the layout stacks: login form first, cafe photo below.</sub>
+</p>
+
 ## Features
 
 ### Secure, role-based access
