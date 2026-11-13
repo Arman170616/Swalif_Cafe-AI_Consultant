@@ -166,10 +166,11 @@ export function printThermalReceipt(data: ReceiptData): void {
 
   <!-- Store header -->
   <div class="header">
-    <div class="logo">Share Cafe ☕</div>
-    <div class="store-name">Al Sada North Branch</div>
+    <div class="logo">Swalif Cafe ☕</div>
+    <div class="store-name">سوالف كافيه</div>
+    <div class="store-name">Al Saadah Branch</div>
     <div class="address">
-      Al Sada North, Oman<br>
+      Al Saadah, Salalah, Oman<br>
       Tel: +968 2212 3456
     </div>
     <div class="vat">VAT Reg. No: OM1100054321</div>
@@ -230,7 +231,7 @@ export function printThermalReceipt(data: ReceiptData): void {
   <!-- Footer -->
   <div class="footer">
     <div class="thank-you">Thank You! شكراً</div>
-    Share Cafe &middot; Al Sada North, Oman<br>
+    Swalif Cafe &middot; Al Saadah, Salalah, Oman<br>
     VAT Invoice &middot; 5% VAT included<br>
     Goods once sold are not returnable<br>
     unless defective within 7 days

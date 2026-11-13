@@ -1,6 +1,6 @@
-# Share Cafe — Management System
+# Swalif_Cafe-AI_Consultant
 
-A cloud-based management system built for **Share Cafe** (Al Saada, Salalah, Oman) — everything needed to run the cafe day to day, in one place: sales, inventory, staff, customers, and reporting. Available in **English and Arabic**, with full right-to-left support.
+A cloud-based management system built for **Swalif Cafe** (Al Saadah, Salalah, Oman) — everything needed to run the cafe day to day, in one place: sales, inventory, staff, customers, and reporting. Available in **English and Arabic**, with full right-to-left support.
 
 ## Features
 

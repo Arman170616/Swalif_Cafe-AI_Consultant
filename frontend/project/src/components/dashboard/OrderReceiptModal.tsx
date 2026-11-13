@@ -112,7 +112,7 @@ export function OrderReceiptModal({ orderId, onClose }: { orderId: number; onClo
 
             <div dir="ltr" className="mt-4 max-h-[320px] overflow-y-auto rounded-2xl border border-white/40 bg-white p-4 font-mono text-[11px] leading-relaxed text-ink-900">
               <div className="text-center">
-                <div className="font-sans text-sm font-black">Share Cafe ☕</div>
+                <div className="font-sans text-sm font-black">Swalif Cafe ☕</div>
                 <div className="text-[10px]">Al Saada, Salalah, Oman</div>
               </div>
               <div className="my-2 border-t border-dashed border-ink-300" />

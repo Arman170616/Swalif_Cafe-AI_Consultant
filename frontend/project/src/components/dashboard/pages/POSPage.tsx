@@ -303,7 +303,7 @@ export function POSPage() {
           <Coffee className="h-5 w-5 shrink-0 text-amber-700" />
           <span className="font-display text-sm font-bold text-ink-900 sm:text-base">
             <span className="sm:hidden">Salalah, Oman</span>
-            <span className="hidden sm:inline">Share Cafe</span>
+            <span className="hidden sm:inline">Swalif Cafe</span>
           </span>
           <span className="hidden text-xs text-ink-500 sm:inline">· Al Saada, Salalah, Oman</span>
         </div>
@@ -862,7 +862,7 @@ function ReceiptModal({ data, onClose, onPrint }: { data: ReceiptData; onClose: 
 
         <div dir="ltr" className="mt-4 max-h-[260px] overflow-y-auto rounded-2xl border border-white/40 bg-white p-4 font-mono text-[11px] leading-relaxed text-ink-900">
           <div className="text-center">
-            <div className="font-sans text-sm font-black">Share Cafe ☕</div>
+            <div className="font-sans text-sm font-black">Swalif Cafe ☕</div>
             <div className="text-[10px]">Al Saada, Salalah, Oman</div>
           </div>
           <div className="my-2 border-t border-dashed border-ink-300" />

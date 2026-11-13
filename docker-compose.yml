@@ -1,0 +1,29 @@
+services:
+  backend:
+    build: ./Backend
+    restart: unless-stopped
+    env_file:
+      - ./Backend/.env.prod
+    volumes:
+      - backend_data:/app/data
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend/project
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      # Self-signed cert generated directly on the host — not part of the image, not in
+      # git (same treatment as .env.prod: real deployment material, generated per-server).
+      - ./certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  backend_data:

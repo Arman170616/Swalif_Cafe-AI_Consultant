@@ -62,6 +62,10 @@ export default {
           '0%, 100%': { transform: 'translateY(0) translateX(0)' },
           '50%': { transform: 'translateY(-18px) translateX(8px)' },
         },
+        'ken-burns': {
+          '0%, 100%': { transform: 'scale(1.04)' },
+          '50%': { transform: 'scale(1.12)' },
+        },
         'float-slow': {
           '0%, 100%': { transform: 'translateY(0) translateX(0) scale(1)' },
           '50%': { transform: 'translateY(24px) translateX(-12px) scale(1.05)' },
@@ -94,6 +98,7 @@ export default {
       animation: {
         float: 'float 9s ease-in-out infinite',
         'float-slow': 'float-slow 14s ease-in-out infinite',
+        'ken-burns': 'ken-burns 24s ease-in-out infinite',
         shimmer: 'shimmer 3s linear infinite',
         'fade-up': 'fade-up 0.6s ease-out both',
         'scale-in': 'scale-in 0.5s ease-out both',

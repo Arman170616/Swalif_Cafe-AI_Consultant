@@ -42,7 +42,7 @@ export function AuthPage() {
             >
               <BrandMark className="h-9 w-9 rounded-xl" />
               <span className="font-display text-lg font-bold tracking-tight text-ink-900">
-                Share<span className="text-brand-600">.</span>
+                Swalif<span className="text-brand-600">.</span>
               </span>
             </div>
 
@@ -58,7 +58,7 @@ export function AuthPage() {
 
           {/* Welcome section — stacks below the login form on mobile/tablet, becomes the
               second column on desktop */}
-          <div className="relative border-t border-brand-100/70 bg-gradient-to-br from-brand-50 via-white to-accent-50 lg:border-t-0">
+          <div className="relative bg-brand-950">
             <WelcomeSection />
           </div>
         </div>

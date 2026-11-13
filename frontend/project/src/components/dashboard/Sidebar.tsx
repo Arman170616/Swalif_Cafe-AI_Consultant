@@ -107,7 +107,7 @@ export function Sidebar({
             <a className="flex items-center gap-2.5">
               <BrandMark className="h-9 w-9 rounded-xl" />
               <span className="font-display text-lg font-bold text-ink-900">
-                Share<span className="text-brand-600">.</span>
+                Swalif<span className="text-brand-600">.</span>
               </span>
             </a>
             <button

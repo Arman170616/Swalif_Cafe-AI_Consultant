@@ -2,3 +2,12 @@
 *.DS_Store
 .vscode/
 .idea/
+
+# secrets — never commit real deployment credentials
+.env.prod
+Backend/.env.prod
+*.env.prod
+
+# self-signed TLS cert/key, generated per-server
+/certs/
+

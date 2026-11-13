@@ -52,7 +52,7 @@ export function PlaceholderPage({
 
       <GlassCard className="p-6 text-center">
         <p className="text-sm text-ink-500">
-          This module is part of the Share platform. Full interactive screens
+          This module is part of the Swalif Cafe platform. Full interactive screens
           ship in the next release — the Dashboard, POS, Inventory and
           Accounting screens are live now.
         </p>

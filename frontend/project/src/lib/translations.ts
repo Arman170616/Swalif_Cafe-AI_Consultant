@@ -62,13 +62,13 @@ const en = {
   'title.reports': 'Reports',
   'subtitle.reports': 'Financial and operational reports',
   'title.help': 'Help & Support',
-  'subtitle.help': 'Get in touch with the Share Cafe team',
+  'subtitle.help': 'Get in touch with the Swalif Cafe team',
 
   // Auth
   'auth.welcomeBack': 'Welcome back',
   'auth.welcomeBackSubtitle': "Sign in with the account your admin set up for you.",
   'auth.createOwnerAccount': 'Create the owner account',
-  'auth.createAdminSubtitle': 'This runs once, for a brand-new Share Cafe deployment — it creates the Admin account. Every other login afterward is provisioned by an admin.',
+  'auth.createAdminSubtitle': 'This runs once, for a brand-new Swalif Cafe deployment — it creates the Admin account. Every other login afterward is provisioned by an admin.',
   'auth.firstTimeSetup': 'First-time setup',
   'auth.username': 'Username',
   'auth.password': 'Password',
@@ -76,8 +76,8 @@ const en = {
   'auth.signIn': 'Sign in',
   'auth.createAdminAccount': 'Create admin account',
   'auth.noAccount': "Don't have an account? Ask your cafe's admin to create one for you.",
-  'auth.productTagline': 'Share Cafe Management Software',
-  'auth.welcomeBody': 'Sign in to manage your sales, inventory, staff and reports — everything Share Cafe needs, in one place.',
+  'auth.productTagline': 'Swalif Cafe Management Software',
+  'auth.welcomeBody': 'Sign in to manage your sales, inventory, staff and reports — everything Swalif Cafe needs, in one place.',
   'auth.usernameRequired': 'Please enter your username.',
   'auth.passwordRequired': 'Please enter your password.',
   'auth.signingIn': 'Signing in…',
@@ -87,13 +87,13 @@ const en = {
   // Help
   'help.support': 'Support',
   'help.needHand': "Need a hand? We're here to help.",
-  'help.reachUs': 'Reach the Share Cafe system provider directly for setup help, bug reports or account issues.',
+  'help.reachUs': 'Reach the Swalif Cafe system provider directly for setup help, bug reports or account issues.',
   'help.providedBy': 'Provided by',
   'help.getDirections': 'Get directions',
   'help.chatWhatsapp': 'Chat with us on WhatsApp',
   'help.fastestWay': 'Fastest way to reach support — message us anytime.',
   'help.messageWhatsapp': 'Message on WhatsApp',
-  'help.footer': 'Share Cafe ERP is built and maintained by {company}. For anything not covered here — feature requests, training or technical issues — WhatsApp is the quickest way to reach us.',
+  'help.footer': 'Swalif Cafe ERP is built and maintained by {company}. For anything not covered here — feature requests, training or technical issues — WhatsApp is the quickest way to reach us.',
 
   // Dashboard / Overview
   'dash.revenueToday': 'Revenue Today',
@@ -463,6 +463,22 @@ const en = {
   'receipt.notYetPaid': 'NOT YET PAID · balance',
   'receipt.unpaid': 'Unpaid',
   'receipt.noInvoiceIssued': 'No invoice was issued for this order',
+
+  'auth.interiorAlt': 'Inside Swalif Cafe',
+  'auth.location': 'Al Saadah, Salalah',
+  'auth.hours': 'Open daily · 8:00 AM – 3:00 AM',
+
+  // Notifications
+  'notif.title': 'Notifications',
+  'notif.unread': '{count} unread',
+  'notif.allCaughtUp': "You're all caught up",
+  'notif.markAllRead': 'Mark all read',
+  'notif.empty': 'No notifications yet',
+  'notif.emptyHint': 'Stock alerts and activity will show up here.',
+  'notif.justNow': 'Just now',
+  'notif.minutesAgo': '{n}m ago',
+  'notif.hoursAgo': '{n}h ago',
+  'notif.daysAgo': '{n}d ago',
 } satisfies Record<string, string>;
 
 const ar: Record<keyof typeof en, string> = {
@@ -523,13 +539,13 @@ const ar: Record<keyof typeof en, string> = {
   'title.reports': 'التقارير',
   'subtitle.reports': 'التقارير المالية والتشغيلية',
   'title.help': 'المساعدة والدعم',
-  'subtitle.help': 'تواصل مع فريق شير كافيه',
+  'subtitle.help': 'تواصل مع فريق سوالف كافيه',
 
   // Auth
   'auth.welcomeBack': 'مرحباً بعودتك',
   'auth.welcomeBackSubtitle': 'سجّل الدخول بالحساب الذي أنشأه المسؤول لك.',
   'auth.createOwnerAccount': 'إنشاء حساب المالك',
-  'auth.createAdminSubtitle': 'يتم هذا مرة واحدة فقط عند إعداد شير كافيه لأول مرة — وينشئ حساب المسؤول. أي حساب آخر بعد ذلك ينشئه المسؤول.',
+  'auth.createAdminSubtitle': 'يتم هذا مرة واحدة فقط عند إعداد سوالف كافيه لأول مرة — وينشئ حساب المسؤول. أي حساب آخر بعد ذلك ينشئه المسؤول.',
   'auth.firstTimeSetup': 'الإعداد الأول',
   'auth.username': 'اسم المستخدم',
   'auth.password': 'كلمة المرور',
@@ -537,8 +553,8 @@ const ar: Record<keyof typeof en, string> = {
   'auth.signIn': 'تسجيل الدخول',
   'auth.createAdminAccount': 'إنشاء حساب المسؤول',
   'auth.noAccount': 'ليس لديك حساب؟ اطلب من مسؤول المقهى إنشاء حساب لك.',
-  'auth.productTagline': 'نظام إدارة شير كافيه',
-  'auth.welcomeBody': 'سجّل الدخول لإدارة مبيعاتك ومخزونك وموظفيك وتقاريرك — كل ما يحتاجه شير كافيه في مكان واحد.',
+  'auth.productTagline': 'نظام إدارة سوالف كافيه',
+  'auth.welcomeBody': 'سجّل الدخول لإدارة مبيعاتك ومخزونك وموظفيك وتقاريرك — كل ما يحتاجه سوالف كافيه في مكان واحد.',
   'auth.usernameRequired': 'الرجاء إدخال اسم المستخدم.',
   'auth.passwordRequired': 'الرجاء إدخال كلمة المرور.',
   'auth.signingIn': 'جارٍ تسجيل الدخول…',
@@ -548,13 +564,13 @@ const ar: Record<keyof typeof en, string> = {
   // Help
   'help.support': 'الدعم',
   'help.needHand': 'تحتاج مساعدة؟ نحن هنا من أجلك.',
-  'help.reachUs': 'تواصل مباشرة مع مزوّد نظام شير كافيه للمساعدة في الإعداد أو الإبلاغ عن مشكلة أو مسائل الحساب.',
+  'help.reachUs': 'تواصل مباشرة مع مزوّد نظام سوالف كافيه للمساعدة في الإعداد أو الإبلاغ عن مشكلة أو مسائل الحساب.',
   'help.providedBy': 'مقدَّم من',
   'help.getDirections': 'الحصول على الاتجاهات',
   'help.chatWhatsapp': 'تواصل معنا عبر واتساب',
   'help.fastestWay': 'أسرع طريقة للوصول إلى الدعم — راسلنا في أي وقت.',
   'help.messageWhatsapp': 'مراسلة عبر واتساب',
-  'help.footer': 'نظام شير كافيه مبني ومُدار من قِبل {company}. لأي أمر لم تجده هنا — طلبات ميزات جديدة أو تدريب أو مشاكل تقنية — واتساب هو أسرع وسيلة للتواصل معنا.',
+  'help.footer': 'نظام سوالف كافيه مبني ومُدار من قِبل {company}. لأي أمر لم تجده هنا — طلبات ميزات جديدة أو تدريب أو مشاكل تقنية — واتساب هو أسرع وسيلة للتواصل معنا.',
 
   // Dashboard / Overview
   'dash.revenueToday': 'إيرادات اليوم',
@@ -924,6 +940,22 @@ const ar: Record<keyof typeof en, string> = {
   'receipt.notYetPaid': 'لم يُدفع بعد · الرصيد المتبقي',
   'receipt.unpaid': 'غير مدفوع',
   'receipt.noInvoiceIssued': 'لم تُصدر فاتورة لهذا الطلب',
+
+  'auth.interiorAlt': 'داخل سوالف كافيه',
+  'auth.location': 'السعادة، صلالة',
+  'auth.hours': 'مفتوح يومياً · ٨:٠٠ ص – ٣:٠٠ ص',
+
+  // Notifications
+  'notif.title': 'الإشعارات',
+  'notif.unread': '{count} غير مقروءة',
+  'notif.allCaughtUp': 'لا توجد إشعارات جديدة',
+  'notif.markAllRead': 'تحديد الكل كمقروء',
+  'notif.empty': 'لا توجد إشعارات بعد',
+  'notif.emptyHint': 'ستظهر هنا تنبيهات المخزون والنشاطات.',
+  'notif.justNow': 'الآن',
+  'notif.minutesAgo': 'منذ {n} د',
+  'notif.hoursAgo': 'منذ {n} س',
+  'notif.daysAgo': 'منذ {n} ي',
 };
 
 export const dictionaries: Record<Lang, Record<string, string>> = { en, ar };

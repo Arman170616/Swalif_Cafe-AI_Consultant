@@ -85,7 +85,11 @@ type Params = Record<string, string | number | boolean | undefined | null>;
 type RequestOptions = { method?: string; body?: unknown; params?: Params; skipAuth?: boolean };
 
 function buildUrl(path: string, params?: Params) {
-  const url = new URL(`${API_BASE}${path}`);
+  // Base arg matters in production: VITE_API_BASE_URL is the relative "/api" there (so the
+  // SPA calls the same origin nginx proxies to the backend, avoiding CORS entirely) and
+  // `new URL()` throws a TypeError on a relative-only string with no base. Passing
+  // location.origin fixes that while being a no-op when API_BASE is already absolute (dev).
+  const url = new URL(`${API_BASE}${path}`, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
