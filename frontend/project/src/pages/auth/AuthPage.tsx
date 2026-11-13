@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrandMark } from '../../components/BrandMark';
 import { LanguageSwitch } from '../../components/LanguageSwitch';
+import { MenuButton } from './MenuBook';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { BackgroundParticles } from './BackgroundParticles';
 import { LoginForm } from './LoginForm';
@@ -29,7 +30,10 @@ export function AuthPage() {
           entered ? 'animate-blob-in' : 'opacity-0',
         ].join(' ')}
       >
-        <div className="absolute -top-14 end-0 z-10">
+        {/* in the flow on phones (absolute would push it off-screen above the card),
+            floating above the card's corner from sm up */}
+        <div className="relative z-10 mb-3 flex items-center justify-end gap-2 sm:absolute sm:-top-14 sm:end-0 sm:mb-0">
+          <MenuButton />
           <LanguageSwitch className="bg-white/90 shadow-md" />
         </div>
 

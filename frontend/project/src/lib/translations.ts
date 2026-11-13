@@ -469,6 +469,10 @@ const en = {
   'receipt.noInvoiceIssued': 'No invoice was issued for this order',
 
   'auth.interiorAlt': 'Inside Swalif Cafe',
+  'auth.viewMenu': 'View our menu',
+  'menu.next': 'Next page',
+  'menu.prev': 'Previous page',
+  'menu.close': 'Close menu',
   'auth.location': 'Al Saadah, Salalah',
   'auth.hours': 'Open daily · 8:00 AM – 3:00 AM',
 
@@ -950,6 +954,10 @@ const ar: Record<keyof typeof en, string> = {
   'receipt.noInvoiceIssued': 'لم تُصدر فاتورة لهذا الطلب',
 
   'auth.interiorAlt': 'داخل سوالف كافيه',
+  'auth.viewMenu': 'تصفّح قائمتنا',
+  'menu.next': 'الصفحة التالية',
+  'menu.prev': 'الصفحة السابقة',
+  'menu.close': 'إغلاق القائمة',
   'auth.location': 'السعادة، صلالة',
   'auth.hours': 'مفتوح يومياً · ٨:٠٠ ص – ٣:٠٠ ص',
 
