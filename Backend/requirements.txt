@@ -11,3 +11,4 @@ reportlab==5.0.0
 sqlparse==0.5.5
 gunicorn==23.0.0
 whitenoise==6.9.0
+openpyxl==3.1.5

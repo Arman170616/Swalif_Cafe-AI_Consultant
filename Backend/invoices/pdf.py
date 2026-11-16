@@ -14,8 +14,8 @@ def generate_invoice_pdf(invoice) -> bytes:
     order = invoice.order
 
     elements = [
-        Paragraph("Share Cafe", styles["Title"]),
-        Paragraph("Al Saada, Salalah, Oman", styles["Normal"]),
+        Paragraph("Swalif Cafe", styles["Title"]),
+        Paragraph("Al Saadah, Salalah, Oman", styles["Normal"]),
         Spacer(1, 8),
         Paragraph(f"Invoice: {invoice.invoice_number}", styles["Heading2"]),
         Paragraph(f"Date: {invoice.issued_at:%Y-%m-%d %H:%M}", styles["Normal"]),

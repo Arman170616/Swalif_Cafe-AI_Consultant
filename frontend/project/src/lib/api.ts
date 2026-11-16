@@ -151,10 +151,10 @@ export const api = {
 };
 
 /** Downloads a binary response (PDF invoices/payslips) and saves it via the browser. */
-export async function downloadFile(path: string, filename: string) {
+export async function downloadFile(path: string, filename: string, params?: Params) {
   const headers: Record<string, string> = {};
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-  const res = await fetch(buildUrl(path), { headers });
+  const res = await fetch(buildUrl(path, params), { headers });
   if (!res.ok) throw new ApiError(res.status, null);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

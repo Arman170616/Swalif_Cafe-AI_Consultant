@@ -6,16 +6,21 @@ import {
   Boxes,
   Wallet,
   Calendar,
-  Star,
   Sparkles,
   PieChart,
   Activity,
   Loader2,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  FileDown,
+  Table2,
 } from 'lucide-react';
 import { GlassCard, Badge } from '../../ui';
-import { api } from '../../../lib/api';
+import { api, downloadFile } from '../../../lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import type { TranslationKey } from '../../../lib/translations';
+import { splitName } from './MenuItems';
 
 const PAYMENT_METHOD_KEY: Record<string, TranslationKey> = {
   cash: 'paymentMethod.cash',
@@ -25,41 +30,44 @@ const PAYMENT_METHOD_KEY: Record<string, TranslationKey> = {
 
 type RangeKey = 'daily' | 'monthly' | 'yearly';
 type CatKey = 'sales' | 'expenses' | 'profit' | 'inventory' | 'vat' | 'cashflow';
+type ExportKind = 'pdf' | 'xlsx' | 'csv';
 
-type SalesBucket = { period: string; revenue: string; order_count: number; tax_collected: string };
-type RevenueProfit = { gross_revenue: string; cost_of_goods_sold: string; expenses: string; net_profit: string };
-type Expense = { id: number; category: string; amount: string; date: string };
-type CashflowRow = { method: string; total: string; count: number };
-type BestSeller = { product__id: number; product__name: string; quantity_sold: number; revenue: number };
+/** Mirrors Backend analytics/period_report.py — every figure comes from the database. */
+type PeriodReport = {
+  period: RangeKey;
+  label: string;
+  slug: string;
+  start: string;
+  end: string;
+  summary: {
+    orders: number;
+    cancelled_orders: number;
+    items_sold: number;
+    gross_sales: number;
+    discounts: number;
+    net_sales: number;
+    vat: number;
+    total_billed: number;
+    avg_order_value: number;
+    cogs: number;
+    expenses: number;
+    net_profit: number;
+    payments_received: number;
+  };
+  breakdown: { key: string; label: string; orders: number; net_sales: number; vat: number; cogs: number; expenses: number; net_profit: number }[];
+  products: { product: string; category: string; quantity: number; revenue: number }[];
+  categories: { category: string; quantity: number; revenue: number }[];
+  payments: { method: string; label: string; count: number; total: number }[];
+  order_types: { type: string; label: string; count: number; net_sales: number }[];
+  expenses: { category: string; count: number; total: number }[];
+};
 type LowStockItem = { id: number; name: string; unit: string; quantity_on_hand: string; reorder_threshold: string };
-type Overview = { inventory_value: string; low_stock_count: number };
 
-const RANGE_DAYS_BACK: Record<RangeKey, number> = { daily: 13, monthly: 365, yearly: 365 * 6 };
-
-function rangeStart(range: RangeKey) {
+const omr = (v: number | string, dp = 3) => `OMR ${Number(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
+const todayIso = () => {
   const d = new Date();
-  if (range === 'daily') d.setDate(d.getDate() - RANGE_DAYS_BACK.daily);
-  else if (range === 'monthly') d.setMonth(d.getMonth() - 12);
-  else d.setFullYear(d.getFullYear() - 6);
-  return d.toISOString().slice(0, 10);
-}
-
-function formatPeriodLabel(period: string, range: RangeKey) {
-  // TruncWeek/TruncMonth/TruncYear all return full ISO datetimes, not plain date/year
-  // strings, so labels are always derived via Date parsing rather than string-slicing.
-  const d = new Date(period);
-  if (Number.isNaN(d.getTime())) return period;
-  if (range === 'yearly') return String(d.getFullYear());
-  if (range === 'daily') return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-}
-
-function kpiRangeStart(range: RangeKey) {
-  const d = new Date();
-  if (range === 'daily') return d.toISOString().slice(0, 10);
-  if (range === 'monthly') return new Date(d.setDate(1)).toISOString().slice(0, 10);
-  return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
-}
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const categoryDefs: { key: CatKey; labelKey: TranslationKey; icon: typeof DollarSign; descKey: TranslationKey }[] = [
   { key: 'sales', labelKey: 'reports.cat.sales', icon: DollarSign, descKey: 'reports.cat.salesDesc' },
@@ -71,84 +79,138 @@ const categoryDefs: { key: CatKey; labelKey: TranslationKey; icon: typeof Dollar
 ];
 
 export function ReportsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const locale = lang === 'ar' ? 'ar-OM' : 'en-GB';
+  const localName = (name: string) => {
+    const s = splitName(name);
+    const base = lang === 'ar' && s.ar ? s.ar : s.en;
+    return s.size ? `${base} (${s.size})` : base;
+  };
   const categories = categoryDefs.map((c) => ({ ...c, label: t(c.labelKey), desc: t(c.descKey) }));
-  const [range, setRange] = useState<RangeKey>('monthly');
-  const [cat, setCat] = useState<CatKey>('sales');
-  const [loading, setLoading] = useState(true);
 
-  const [sales, setSales] = useState<SalesBucket[]>([]);
-  const [rp, setRp] = useState<RevenueProfit | null>(null);
-  const [ordersCount, setOrdersCount] = useState(0);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [cashflow, setCashflow] = useState<CashflowRow[]>([]);
-  const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
+  const now = new Date();
+  const [range, setRange] = useState<RangeKey>('monthly');
+  const [day, setDay] = useState(todayIso());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const [cat, setCat] = useState<CatKey>('sales');
+
+  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<PeriodReport | null>(null);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
-  const [overview, setOverview] = useState<Overview | null>(null);
+  const [inventoryValue, setInventoryValue] = useState(0);
+  const [downloading, setDownloading] = useState<ExportKind | null>(null);
+  const [downloadError, setDownloadError] = useState(false);
+
+  const params = useMemo(
+    () =>
+      range === 'daily'
+        ? { period: range, date: day }
+        : range === 'monthly'
+        ? { period: range, year, month }
+        : { period: range, year },
+    [range, day, month, year]
+  );
 
   useEffect(() => {
     setLoading(true);
-    const kpiStart = kpiRangeStart(range);
-    const today = new Date().toISOString().slice(0, 10);
+    api
+      .get<PeriodReport>('/analytics/period-report/', params)
+      .then(setReport)
+      .finally(() => setLoading(false));
+  }, [params]);
 
-    Promise.all([
-      api.get<{ results: SalesBucket[] }>('/analytics/sales/', { period: range, start: rangeStart(range) }),
-      api.get<RevenueProfit>('/analytics/revenue-profit/', { start: kpiStart, end: today }),
-      api.get<{ results: CashflowRow[] }>('/analytics/cashflow/', { start: kpiStart, end: today }),
-      api.get<{ results?: Expense[] } | Expense[]>('/analytics/expenses/'),
-      api.get<BestSeller[]>('/analytics/best-sellers/', { limit: 5, start: kpiStart, end: today }),
-      api.get<LowStockItem[]>('/inventory/ingredients/low_stock/'),
-      api.get<Overview>('/analytics/overview/'),
-    ]).then(([s, r, c, e, b, l, ov]) => {
-      setSales(s.results);
-      setRp(r);
-      setCashflow(c.results);
-      setExpenses(Array.isArray(e) ? e : e.results ?? []);
-      setBestSellers(b);
-      setLowStock(l);
-      setOverview(ov);
-      setOrdersCount(s.results.reduce((sum, bucket) => sum + bucket.order_count, 0));
-    }).finally(() => setLoading(false));
-  }, [range]);
+  // Stock is a "right now" figure, not tied to the reporting period.
+  useEffect(() => {
+    api.get<LowStockItem[]>('/inventory/ingredients/low_stock/').then(setLowStock);
+    api.get<{ inventory_value: string }>('/analytics/overview/').then((o) => setInventoryValue(Number(o.inventory_value)));
+  }, []);
 
-  const kpiTax = sales.reduce((s, b) => s + Number(b.tax_collected), 0);
-  const kpis = useMemo(() => {
-    if (!rp) return [];
-    if (range === 'daily') {
-      return [
-        { label: t('reports.salesToday'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-        { label: t('reports.expensesToday'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-        { label: t('reports.profitToday'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-        { label: t('reports.transactions'), value: String(ordersCount), icon: Activity },
-      ];
+  async function download(kind: ExportKind) {
+    if (!report) return;
+    setDownloading(kind);
+    setDownloadError(false);
+    try {
+      await downloadFile('/analytics/period-report/', `swalif-${report.period}-report-${report.slug}.${kind}`, { ...params, export: kind });
+    } catch {
+      setDownloadError(true);
+    } finally {
+      setDownloading(null);
     }
-    if (range === 'monthly') {
-      return [
-        { label: t('reports.salesMtd'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-        { label: t('reports.expensesMtd'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-        { label: t('reports.netProfit'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-        { label: t('reports.vatCollected'), value: `OMR ${kpiTax.toFixed(2)}`, icon: Receipt },
-      ];
-    }
-    return [
-      { label: t('reports.salesYtd'), value: `OMR ${Number(rp.gross_revenue).toFixed(2)}`, icon: DollarSign },
-      { label: t('reports.expensesYtd'), value: `OMR ${Number(rp.expenses).toFixed(2)}`, icon: TrendingDown },
-      { label: t('reports.netProfitYtd'), value: `OMR ${Number(rp.net_profit).toFixed(2)}`, icon: Wallet },
-      { label: t('dash.inventoryValue'), value: `OMR ${Number(overview?.inventory_value ?? 0).toFixed(0)}`, icon: Boxes },
-    ];
-  }, [rp, range, ordersCount, kpiTax, overview, t]);
+  }
+
+  const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
+  const monthNames = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' }));
+
+  // Localized label for the chosen period (the backend's `label` is English, for exports).
+  const periodLabel = useMemo(() => {
+    if (range === 'daily') return new Date(`${day}T00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+    if (range === 'monthly') return `${monthNames[month - 1]} ${year}`;
+    return String(year);
+  }, [range, day, month, year, locale, monthNames]);
+
+  const bucketLabel = (b: PeriodReport['breakdown'][number], short = false) => {
+    if (range === 'daily') return b.key;
+    const d = new Date(`${b.key}T00:00`);
+    if (range === 'monthly') return short ? String(d.getDate()) : d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString(locale, { month: short ? 'short' : 'long' });
+  };
+
+  const s = report?.summary;
+  const kpis = s
+    ? [
+        { label: t('reports.netSales'), value: omr(s.net_sales), sub: t('reports.ordersCount', { n: String(s.orders) }), icon: DollarSign },
+        { label: t('acc.expenses'), value: omr(s.expenses), sub: periodLabel, icon: TrendingDown },
+        { label: t('reports.netProfit'), value: omr(s.net_profit), sub: t('reports.afterCostsExpenses'), icon: Wallet, negative: s.net_profit < 0 },
+        { label: t('reports.vatCollected'), value: omr(s.vat), sub: t('reports.vatOwed'), icon: Receipt },
+      ]
+    : [];
 
   const expenseByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of expenses) map.set(e.category, (map.get(e.category) ?? 0) + Number(e.amount));
-    const total = [...map.values()].reduce((s, v) => s + v, 0) || 1;
+    const rows = report?.expenses ?? [];
+    const total = rows.reduce((sum, r) => sum + Number(r.total), 0) || 1;
     const colors = ['from-brand-400 to-brand-600', 'from-accent-400 to-accent-600', 'from-amber-400 to-amber-600', 'from-rose-400 to-rose-600', 'from-ink-400 to-ink-600'];
-    return [...map.entries()].map(([label, value], i) => ({ label, value, pct: (value / total) * 100, color: colors[i % colors.length] }));
-  }, [expenses]);
+    return rows.map((r, i) => ({ label: r.category, value: Number(r.total), pct: (Number(r.total) / total) * 100, color: colors[i % colors.length] }));
+  }, [report]);
 
-  if (loading) {
-    return <div className="grid h-96 place-items-center"><Loader2 className="h-8 w-8 animate-spin text-brand-500" /></div>;
-  }
+  const topByQty = useMemo(() => [...(report?.products ?? [])].sort((a, b) => b.quantity - a.quantity).slice(0, 5), [report]);
+
+  const rangeTabs = (
+    <div className="flex gap-1 rounded-2xl bg-white/40 p-1">
+      {(['daily', 'monthly', 'yearly'] as const).map((r) => (
+        <button
+          key={r}
+          onClick={() => setRange(r)}
+          className={['rounded-xl px-4 py-1.5 text-sm font-semibold capitalize transition-all', range === r ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60'].join(' ')}
+        >
+          {t(`reports.${r}` as TranslationKey)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const selectCls = 'rounded-xl border border-white/50 bg-white/60 px-3 py-1.5 text-sm font-semibold text-ink-800 focus:border-brand-300 focus:outline-none';
+  const periodPicker = (
+    <div className="flex items-center gap-2">
+      {range === 'daily' && (
+        <input type="date" value={day} max={todayIso()} onChange={(e) => e.target.value && setDay(e.target.value)} className={selectCls} aria-label={t('reports.selectDate')} />
+      )}
+      {range === 'monthly' && (
+        <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectCls} aria-label={t('reports.selectMonth')}>
+          {monthNames.map((m, i) => (
+            <option key={m} value={i + 1}>{m}</option>
+          ))}
+        </select>
+      )}
+      {range !== 'daily' && (
+        <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectCls} aria-label={t('reports.selectYear')}>
+          {years.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -157,202 +219,312 @@ export function ReportsPage() {
           <Calendar className="h-5 w-5 text-brand-600" />
           <span className="font-display text-base font-bold text-ink-900">{t('reports.reportingPeriod')}</span>
         </div>
-        <div className="flex gap-1 rounded-2xl bg-white/40 p-1">
-          {(['daily', 'monthly', 'yearly'] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={['rounded-xl px-4 py-1.5 text-sm font-semibold capitalize transition-all', range === r ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-white/60'].join(' ')}
-            >
-              {t(`reports.${r}` as TranslationKey)}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {periodPicker}
+          {rangeTabs}
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((k) => {
-          const Icon = k.icon;
-          return (
-            <GlassCard key={k.label} sheen hover className="p-5">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-glow"><Icon className="h-5 w-5" /></span>
-              <div className="mt-4 font-display text-2xl font-bold text-ink-900">{k.value}</div>
-              <div className="text-xs text-ink-500">{k.label}</div>
-            </GlassCard>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <GlassCard className="p-5 lg:col-span-2">
-          <div>
-            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.salesTrend')}</h3>
-            <p className="text-xs text-ink-500 capitalize">{t('reports.revenueOf', { range: t(`reports.${range}` as TranslationKey) })}</p>
-          </div>
-          <MiniBarChart data={sales.map((b) => Number(b.revenue))} labels={sales.map((b) => formatPeriodLabel(b.period, range))} noDataLabel={t('reports.noDataPeriod')} />
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <h3 className="font-display text-base font-bold text-ink-900">{t('reports.reportCategory')}</h3>
-          <p className="text-xs text-ink-500">{t('reports.pickDomain')}</p>
-          <div className="mt-4 space-y-2">
-            {categories.map((c) => {
-              const Icon = c.icon;
-              const isActive = cat === c.key;
+      {loading || !report || !s ? (
+        <div className="grid h-96 place-items-center"><Loader2 className="h-8 w-8 animate-spin text-brand-500" /></div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {kpis.map((k) => {
+              const Icon = k.icon;
               return (
-                <button
-                  key={c.key}
-                  onClick={() => setCat(c.key)}
-                  className={['group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all', isActive ? 'border-brand-300 bg-brand-50/60' : 'border-white/40 bg-white/30 hover:-translate-y-0.5 hover:border-brand-200 hover:bg-white/50'].join(' ')}
-                >
-                  <span className={['grid h-10 w-10 place-items-center rounded-xl text-white shadow-glow transition-all', isActive ? 'bg-gradient-to-br from-brand-400 to-brand-700' : 'bg-gradient-to-br from-ink-400 to-ink-600'].join(' ')}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-ink-900">{c.label}</div>
-                    <div className="text-xs text-ink-500">{c.desc}</div>
-                  </div>
-                  {isActive && <Sparkles className="h-4 w-4 text-brand-600" />}
-                </button>
+                <GlassCard key={k.label} sheen hover className="p-5">
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-glow"><Icon className="h-5 w-5" /></span>
+                  <div className={['mt-4 font-display text-2xl font-bold', k.negative ? 'text-rose-600' : 'text-ink-900'].join(' ')}>{k.value}</div>
+                  <div className="text-xs font-semibold text-ink-600">{k.label}</div>
+                  <div className="text-[11px] text-ink-400">{k.sub}</div>
+                </GlassCard>
               );
             })}
           </div>
-        </GlassCard>
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <GlassCard className="p-5 lg:col-span-2">
-          <h3 className="font-display text-base font-bold text-ink-900">{t('reports.detail', { category: categories.find((c) => c.key === cat)?.label ?? '' })}</h3>
-          <div className="mt-4">
-            <CategoryDetail cat={cat} rp={rp} expenseByCategory={expenseByCategory} cashflow={cashflow} lowStock={lowStock} bestSellers={bestSellers} sales={sales} />
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.topSellingProducts')}</h3>
-            <Badge tone="brand"><PieChart className="h-3 w-3" /> {t('reports.top5')}</Badge>
-          </div>
-          <p className="mt-0.5 text-xs text-ink-500">{t('reports.byQuantity')}</p>
-          <div className="mt-4 space-y-3">
-            {bestSellers.map((b) => {
-              const max = bestSellers[0]?.quantity_sold || 1;
-              return (
-                <div key={b.product__id}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="font-medium text-ink-700">{b.product__name}</span>
-                    <span className="font-semibold text-ink-900">{b.quantity_sold} {t('reports.sold')}</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/50">
-                    <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-700" style={{ width: `${(b.quantity_sold / max) * 100}%` }} />
-                  </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <GlassCard className="p-5 lg:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-display text-base font-bold text-ink-900">{t('reports.salesTrend')}</h3>
+                  <p className="text-xs text-ink-500">{t(`reports.breakdownSub.${range}` as TranslationKey)} · {periodLabel}</p>
                 </div>
-              );
-            })}
-            {bestSellers.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesPeriod')}</p>}
-          </div>
-        </GlassCard>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <GlassCard className="p-5">
-          <div>
-            <h3 className="font-display text-base font-bold text-ink-900">{t('reports.expenseBreakdown')}</h3>
-            <p className="text-xs text-ink-500">{t('reports.whereMoneyWent')}</p>
-          </div>
-          <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-white/50">
-            {expenseByCategory.map((e) => <div key={e.label} className={`h-full bg-gradient-to-r ${e.color}`} style={{ width: `${e.pct}%` }} title={`${e.label} · ${e.pct.toFixed(1)}%`} />)}
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {expenseByCategory.map((e) => (
-              <div key={e.label} className="rounded-xl border border-white/40 bg-white/30 p-3">
-                <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${e.color}`} /><span className="text-xs font-semibold text-ink-700">{e.label}</span></div>
-                <div className="mt-1.5 font-display text-base font-bold text-ink-900">OMR {e.value.toLocaleString()}</div>
-                <div className="text-[10px] text-ink-400">{t('reports.pctOfTotal', { pct: e.pct.toFixed(1) })}</div>
+                {s.cancelled_orders > 0 && <Badge tone="neutral">{t('reports.cancelledNote', { n: String(s.cancelled_orders) })}</Badge>}
               </div>
-            ))}
-            {expenseByCategory.length === 0 && <p className="col-span-full text-sm text-ink-400">{t('reports.noExpensesYet')}</p>}
-          </div>
-        </GlassCard>
+              <MiniBarChart
+                data={report.breakdown.map((b) => Number(b.net_sales))}
+                labels={report.breakdown.map((b) => bucketLabel(b, true))}
+                every={range === 'monthly' ? 5 : 1}
+                noDataLabel={t('reports.noDataPeriod')}
+              />
+            </GlassCard>
 
-        <GlassCard className="p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display text-base font-bold text-ink-900">{t('reports.namedExports')}</h3>
-              <p className="text-xs text-ink-500">{t('acc.notAvailable')}</p>
-            </div>
+            <GlassCard className="p-5">
+              <h3 className="font-display text-base font-bold text-ink-900">{t('reports.reportCategory')}</h3>
+              <p className="text-xs text-ink-500">{t('reports.pickDomain')}</p>
+              <div className="mt-4 space-y-2">
+                {categories.map((c) => {
+                  const Icon = c.icon;
+                  const isActive = cat === c.key;
+                  return (
+                    <button
+                      key={c.key}
+                      onClick={() => setCat(c.key)}
+                      className={['group flex w-full items-center gap-3 rounded-2xl border p-3 text-start transition-all', isActive ? 'border-brand-300 bg-brand-50/60' : 'border-white/40 bg-white/30 hover:-translate-y-0.5 hover:border-brand-200 hover:bg-white/50'].join(' ')}
+                    >
+                      <span className={['grid h-10 w-10 place-items-center rounded-xl text-white shadow-glow transition-all', isActive ? 'bg-gradient-to-br from-brand-400 to-brand-700' : 'bg-gradient-to-br from-ink-400 to-ink-600'].join(' ')}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-ink-900">{c.label}</div>
+                        <div className="text-xs text-ink-500">{c.desc}</div>
+                      </div>
+                      {isActive && <Sparkles className="h-4 w-4 text-brand-600" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </GlassCard>
           </div>
-          <div className="mt-4 rounded-2xl border border-brand-200/50 bg-brand-50/50 p-4">
-            <div className="flex items-center gap-2"><Badge tone="neutral"><Star className="h-3 w-3" /> {t('reports.notBuilt')}</Badge></div>
-            <p className="mt-2 text-xs leading-relaxed text-ink-600">
-              {t('reports.namedExportsDesc')}
-            </p>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <GlassCard className="p-5 lg:col-span-2">
+              <h3 className="font-display text-base font-bold text-ink-900">{t('reports.detail', { category: categories.find((c) => c.key === cat)?.label ?? '' })}</h3>
+              <p className="text-xs text-ink-500">{periodLabel}</p>
+              <div className="mt-4 max-h-80 overflow-y-auto pe-1">
+                <CategoryDetail
+                  cat={cat}
+                  report={report}
+                  lowStock={lowStock}
+                  inventoryValue={inventoryValue}
+                  localName={localName}
+                  bucketLabel={(b) => bucketLabel(b)}
+                />
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-base font-bold text-ink-900">{t('reports.topSellingProducts')}</h3>
+                <Badge tone="brand"><PieChart className="h-3 w-3" /> {t('reports.top5')}</Badge>
+              </div>
+              <p className="mt-0.5 text-xs text-ink-500">{t('reports.byQuantity')}</p>
+              <div className="mt-4 space-y-3">
+                {topByQty.map((b) => {
+                  const max = topByQty[0]?.quantity || 1;
+                  return (
+                    <div key={b.product}>
+                      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate font-medium text-ink-700">{localName(b.product)}</span>
+                        <span className="shrink-0 font-semibold text-ink-900">{b.quantity} {t('reports.sold')}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/50">
+                        <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-700" style={{ width: `${(b.quantity / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {topByQty.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesPeriod')}</p>}
+              </div>
+            </GlassCard>
           </div>
-        </GlassCard>
-      </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <GlassCard className="p-5">
+              <div>
+                <h3 className="font-display text-base font-bold text-ink-900">{t('reports.expenseBreakdown')}</h3>
+                <p className="text-xs text-ink-500">{t('reports.whereMoneyWent')} · {periodLabel}</p>
+              </div>
+              <div className="mt-5 flex h-3 w-full overflow-hidden rounded-full bg-white/50">
+                {expenseByCategory.map((e) => <div key={e.label} className={`h-full bg-gradient-to-r ${e.color}`} style={{ width: `${e.pct}%` }} title={`${e.label} · ${e.pct.toFixed(1)}%`} />)}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                {expenseByCategory.map((e) => (
+                  <div key={e.label} className="rounded-xl border border-white/40 bg-white/30 p-3">
+                    <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${e.color}`} /><span className="text-xs font-semibold text-ink-700">{e.label}</span></div>
+                    <div className="mt-1.5 font-display text-base font-bold text-ink-900">{omr(e.value)}</div>
+                    <div className="text-[10px] text-ink-400">{t('reports.pctOfTotal', { pct: e.pct.toFixed(1) })}</div>
+                  </div>
+                ))}
+                {expenseByCategory.length === 0 && <p className="col-span-full text-sm text-ink-400">{t('reports.noExpensesPeriod')}</p>}
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-base font-bold text-ink-900">{t('reports.download')}</h3>
+                  <p className="text-xs text-ink-500">{t('reports.downloadSub', { label: periodLabel })}</p>
+                </div>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700"><Download className="h-5 w-5" /></span>
+              </div>
+              <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+                {([
+                  ['pdf', FileText, 'PDF', 'reports.pdfDesc', 'from-rose-500 to-brand-700'],
+                  ['xlsx', FileSpreadsheet, 'Excel', 'reports.xlsxDesc', 'from-emerald-500 to-emerald-700'],
+                  ['csv', FileDown, 'CSV', 'reports.csvDesc', 'from-sky-500 to-sky-700'],
+                ] as const).map(([kind, Icon, name, descKey, grad]) => (
+                  <button
+                    key={kind}
+                    onClick={() => download(kind)}
+                    disabled={downloading !== null}
+                    className="group flex flex-col items-start gap-2 rounded-2xl border border-white/50 bg-white/40 p-3 text-start transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-white/70 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${grad} text-white shadow`}>
+                      {downloading === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                    </span>
+                    <span className="text-sm font-bold text-ink-900">{name}</span>
+                    <span className="text-[11px] leading-snug text-ink-500">{t(descKey)}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-ink-400">{t('reports.includes')}</p>
+              {downloadError && <p className="mt-2 text-xs font-semibold text-rose-600">{t('reports.downloadFailed')}</p>}
+            </GlassCard>
+          </div>
+
+          <BreakdownTable report={report} title={t('reports.breakdownTitle', { label: periodLabel })} bucketLabel={(b) => bucketLabel(b)} />
+        </>
+      )}
     </div>
   );
 }
 
-function CategoryDetail({ cat, rp, expenseByCategory, cashflow, lowStock, bestSellers, sales }: {
+function BreakdownTable({ report, title, bucketLabel }: { report: PeriodReport; title: string; bucketLabel: (b: PeriodReport['breakdown'][number]) => string }) {
+  const { t } = useLanguage();
+  const [hideEmpty, setHideEmpty] = useState(true);
+  const rows = hideEmpty ? report.breakdown.filter((r) => r.orders > 0 || Number(r.expenses) > 0) : report.breakdown;
+  const s = report.summary;
+  const unitKey = { daily: 'reports.col.hour', monthly: 'reports.col.day', yearly: 'reports.col.month' }[report.period] as TranslationKey;
+  const num = (v: number) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  const cols: TranslationKey[] = ['reports.col.orders', 'reports.col.netSales', 'reports.col.vat', 'reports.col.cogs', 'reports.col.expenses', 'reports.col.netProfit'];
+
+  return (
+    <GlassCard className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-100 text-brand-700"><Table2 className="h-4 w-4" /></span>
+          <div>
+            <h3 className="font-display text-base font-bold text-ink-900">{title}</h3>
+            <p className="text-xs text-ink-500">{t(`reports.breakdownSub.${report.period}` as TranslationKey)} · OMR</p>
+          </div>
+        </div>
+        {report.period !== 'daily' && (
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-600">
+            <input type="checkbox" checked={hideEmpty} onChange={(e) => setHideEmpty(e.target.checked)} className="accent-brand-600" />
+            {t('reports.hideEmpty')}
+          </label>
+        )}
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-ink-200/60 text-xs text-ink-500">
+              <th className="py-2 text-start font-semibold">{t(unitKey)}</th>
+              {cols.map((c) => <th key={c} className="py-2 text-end font-semibold">{t(c)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} className={['border-b border-white/60', r.orders === 0 && Number(r.expenses) === 0 ? 'text-ink-300' : 'text-ink-800'].join(' ')}>
+                <td className="py-2 font-medium">{bucketLabel(r)}</td>
+                <td className="py-2 text-end tabular-nums">{r.orders}</td>
+                <td className="py-2 text-end tabular-nums">{num(r.net_sales)}</td>
+                <td className="py-2 text-end tabular-nums">{num(r.vat)}</td>
+                <td className="py-2 text-end tabular-nums">{num(r.cogs)}</td>
+                <td className="py-2 text-end tabular-nums">{num(r.expenses)}</td>
+                <td className={['py-2 text-end font-semibold tabular-nums', r.net_profit < 0 ? 'text-rose-600' : ''].join(' ')}>{num(r.net_profit)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="py-6 text-center text-ink-400">{t('reports.noDataPeriod')}</td></tr>
+            )}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-brand-200 font-bold text-ink-900">
+              <td className="py-2.5">{t('reports.total')}</td>
+              <td className="py-2.5 text-end tabular-nums">{s.orders}</td>
+              <td className="py-2.5 text-end tabular-nums">{num(s.net_sales)}</td>
+              <td className="py-2.5 text-end tabular-nums">{num(s.vat)}</td>
+              <td className="py-2.5 text-end tabular-nums">{num(s.cogs)}</td>
+              <td className="py-2.5 text-end tabular-nums">{num(s.expenses)}</td>
+              <td className={['py-2.5 text-end tabular-nums', s.net_profit < 0 ? 'text-rose-600' : 'text-brand-700'].join(' ')}>{num(s.net_profit)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </GlassCard>
+  );
+}
+
+function CategoryDetail({ cat, report, lowStock, inventoryValue, localName, bucketLabel }: {
   cat: CatKey;
-  rp: RevenueProfit | null;
-  expenseByCategory: { label: string; value: number; pct: number }[];
-  cashflow: CashflowRow[];
+  report: PeriodReport;
   lowStock: LowStockItem[];
-  bestSellers: BestSeller[];
-  sales: SalesBucket[];
+  inventoryValue: number;
+  localName: (name: string) => string;
+  bucketLabel: (b: PeriodReport['breakdown'][number]) => string;
 }) {
   const { t } = useLanguage();
+  const s = report.summary;
   if (cat === 'sales') {
     return (
       <div className="space-y-2">
-        {bestSellers.map((b) => (
-          <Row key={b.product__id} label={b.product__name} value={`${b.quantity_sold} ${t('reports.sold')} · OMR ${Number(b.revenue).toFixed(2)}`} />
+        {report.products.map((p) => (
+          <Row key={p.product} label={localName(p.product)} value={`${p.quantity} ${t('reports.sold')} · ${omr(p.revenue)}`} />
         ))}
-        {bestSellers.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesYet')}</p>}
+        {report.products.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesPeriod')}</p>}
       </div>
     );
   }
   if (cat === 'expenses') {
     return (
       <div className="space-y-2">
-        {expenseByCategory.map((e) => <Row key={e.label} label={e.label} value={`OMR ${e.value.toFixed(2)} (${e.pct.toFixed(1)}%)`} />)}
-        {expenseByCategory.length === 0 && <p className="text-sm text-ink-400">{t('reports.noExpensesYet')}</p>}
+        {report.expenses.map((e) => <Row key={e.category} label={e.category} value={`${omr(e.total)} · ${e.count}×`} />)}
+        {report.expenses.length === 0 && <p className="text-sm text-ink-400">{t('reports.noExpensesPeriod')}</p>}
       </div>
     );
   }
-  if (cat === 'profit' && rp) {
+  if (cat === 'profit') {
     return (
       <div className="space-y-2">
-        <Row label={t('reports.grossRevenue')} value={`OMR ${Number(rp.gross_revenue).toFixed(2)}`} />
-        <Row label={t('reports.cogs')} value={`OMR ${Number(rp.cost_of_goods_sold).toFixed(2)}`} />
-        <Row label={t('acc.expenses')} value={`OMR ${Number(rp.expenses).toFixed(2)}`} />
-        <Row label={t('reports.netProfitRow')} value={`OMR ${Number(rp.net_profit).toFixed(2)}`} bold />
+        <Row label={t('reports.grossSales')} value={omr(s.gross_sales)} />
+        <Row label={t('reports.discounts')} value={`− ${omr(s.discounts)}`} />
+        <Row label={t('reports.netSales')} value={omr(s.net_sales)} bold />
+        <Row label={t('reports.cogs')} value={`− ${omr(s.cogs)}`} />
+        <Row label={t('acc.expenses')} value={`− ${omr(s.expenses)}`} />
+        <Row label={t('reports.netProfitRow')} value={omr(s.net_profit)} bold />
+        <p className="pt-1 text-[11px] text-ink-400">{t('reports.vatNote')}</p>
       </div>
     );
   }
   if (cat === 'inventory') {
     return (
       <div className="space-y-2">
+        <Row label={t('dash.inventoryValue')} value={omr(inventoryValue)} bold />
         {lowStock.map((i) => <Row key={i.id} label={i.name} value={`${Number(i.quantity_on_hand).toFixed(1)} / ${t('inv.reorderThreshold')} ${Number(i.reorder_threshold).toFixed(1)} ${i.unit}`} />)}
         {lowStock.length === 0 && <p className="text-sm text-ink-400">{t('reports.nothingLowStock')}</p>}
+        <p className="pt-1 text-[11px] text-ink-400">{t('reports.stockIsNow')}</p>
       </div>
     );
   }
   if (cat === 'vat') {
+    const rows = report.breakdown.filter((b) => Number(b.vat) > 0);
     return (
       <div className="space-y-2">
-        {sales.map((b) => <Row key={b.period} label={formatPeriodLabel(b.period, 'monthly')} value={`OMR ${Number(b.tax_collected).toFixed(3)} VAT`} />)}
-        {sales.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesYet')}</p>}
+        {rows.map((b) => <Row key={b.key} label={bucketLabel(b)} value={omr(b.vat)} />)}
+        {rows.length === 0 && <p className="text-sm text-ink-400">{t('reports.noSalesPeriod')}</p>}
+        <Row label={t('reports.total')} value={omr(s.vat)} bold />
       </div>
     );
   }
   if (cat === 'cashflow') {
     return (
       <div className="space-y-2">
-        {cashflow.map((c) => <Row key={c.method} label={PAYMENT_METHOD_KEY[c.method] ? t(PAYMENT_METHOD_KEY[c.method]) : c.method} value={`OMR ${Number(c.total).toFixed(2)} (${t('reports.paymentsCount', { n: String(c.count) })})`} />)}
-        {cashflow.length === 0 && <p className="text-sm text-ink-400">{t('reports.noPaymentsPeriod')}</p>}
+        {report.payments.map((c) => <Row key={c.method} label={PAYMENT_METHOD_KEY[c.method] ? t(PAYMENT_METHOD_KEY[c.method]) : c.label} value={`${omr(c.total)} (${t('reports.paymentsCount', { n: String(c.count) })})`} />)}
+        {report.payments.length === 0 && <p className="text-sm text-ink-400">{t('reports.noPaymentsPeriod')}</p>}
+        {report.payments.length > 0 && <Row label={t('reports.total')} value={omr(s.payments_received)} bold />}
       </div>
     );
   }
@@ -361,19 +533,22 @@ function CategoryDetail({ cat, rp, expenseByCategory, cashflow, lowStock, bestSe
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/40 bg-white/30 px-3 py-2 text-sm capitalize">
-      <span className="text-ink-600">{label}</span>
-      <span className={bold ? 'font-bold text-brand-700' : 'font-semibold text-ink-900'}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/40 bg-white/30 px-3 py-2 text-sm">
+      <span className="truncate text-ink-600">{label}</span>
+      <span className={['shrink-0 tabular-nums', bold ? 'font-bold text-brand-700' : 'font-semibold text-ink-900'].join(' ')}>{value}</span>
     </div>
   );
 }
 
-function MiniBarChart({ data, labels, noDataLabel }: { data: number[]; labels: string[]; noDataLabel: string }) {
-  const max = Math.max(...data, 1);
+function MiniBarChart({ data, labels, every = 1, noDataLabel }: { data: number[]; labels: string[]; every?: number; noDataLabel: string }) {
+  const max = Math.max(...data, 0);
   const [hover, setHover] = useState<number | null>(null);
+  if (data.length === 0 || max === 0) {
+    return <div className="mt-6 grid h-44 place-items-center text-sm text-ink-400">{noDataLabel}</div>;
+  }
   return (
-    <div className="mt-6">
-      <div className="flex h-44 items-end gap-2">
+    <div className="mt-6" dir="ltr">
+      <div className="flex h-44 items-end gap-1">
         {data.map((v, i) => {
           const h = Math.round((v / max) * 100);
           const isHover = hover === i;
@@ -381,17 +556,23 @@ function MiniBarChart({ data, labels, noDataLabel }: { data: number[]; labels: s
             <div key={i} className="group relative flex h-44 flex-1 flex-col items-center justify-end" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               {isHover && (
                 <div className="absolute -top-9 z-10 whitespace-nowrap rounded-lg bg-ink-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
-                  OMR {v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {labels[i]} · {omr(v)}
                 </div>
               )}
-              <div className={['w-full max-w-[28px] rounded-t-lg transition-all duration-500', isHover ? 'bg-gradient-to-t from-brand-500 to-brand-300' : 'bg-gradient-to-t from-brand-600 to-brand-400 opacity-80 group-hover:opacity-100'].join(' ')} style={{ height: `${h}%` }} />
+              <div
+                className={['w-full max-w-[28px] rounded-t-md transition-all duration-500', v === 0 ? 'bg-ink-200/50' : isHover ? 'bg-gradient-to-t from-brand-500 to-brand-300' : 'bg-gradient-to-t from-brand-600 to-brand-400 opacity-80 group-hover:opacity-100'].join(' ')}
+                style={{ height: v === 0 ? '2px' : `${Math.max(h, 2)}%` }}
+              />
             </div>
           );
         })}
-        {data.length === 0 && <p className="w-full text-center text-sm text-ink-400">{noDataLabel}</p>}
       </div>
-      <div className="mt-2 flex gap-2">
-        {labels.map((l, i) => <div key={i} className="flex-1 text-center text-[10px] font-medium text-ink-400">{l}</div>)}
+      <div className="mt-2 flex gap-1">
+        {labels.map((l, i) => (
+          <div key={i} className="flex-1 text-center text-[10px] font-medium text-ink-400">
+            {i % every === 0 || i === labels.length - 1 ? l : ''}
+          </div>
+        ))}
       </div>
     </div>
   );

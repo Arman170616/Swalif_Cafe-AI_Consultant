@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.db.models import Avg, Count, DecimalField, ExpressionWrapper, F, Sum
 from django.db.models.functions import ExtractHour, TruncDate, TruncMonth, TruncWeek, TruncYear
 from django.utils import timezone
+from django.http import HttpResponse
 from django.utils.dateparse import parse_date
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -17,6 +18,7 @@ from inventory.models import Ingredient
 from pos.models import Order, OrderItem, Payment
 
 from .models import Expense
+from .period_report import build_period_report, export_csv, export_pdf, export_xlsx, report_filename, resolve_period
 from .serializers import ExpenseSerializer
 
 TRUNC_FUNCS = {
@@ -292,3 +294,46 @@ class CashflowView(APIView):
             .order_by("-total")
         )
         return Response({"start": start, "end": end, "results": list(qs)})
+
+
+class PeriodReportView(APIView):
+    """Full daily/monthly/yearly report from the database, as JSON or a download.
+
+    GET /api/analytics/period-report/?period=monthly&year=2026&month=11
+        period=daily&date=2026-11-15 · period=yearly&year=2026
+        &export=pdf|csv|xlsx  → file download instead of JSON
+    (`export`, not `format`: DRF reserves ?format= for its own renderer switching.)
+    """
+
+    permission_classes = [IsManagerOrAdmin]
+    EXPORTS = {
+        "pdf": (export_pdf, "application/pdf"),
+        "csv": (export_csv, "text/csv; charset=utf-8"),
+        "xlsx": (export_xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    }
+
+    def get(self, request):
+        q = request.query_params
+        kind = q.get("period", "monthly")
+        if kind not in ("daily", "monthly", "yearly"):
+            return Response({"detail": "period must be daily, monthly or yearly"}, status=400)
+        try:
+            year = int(q["year"]) if q.get("year") else None
+            month = int(q["month"]) if q.get("month") else None
+            if year is not None and not 2000 <= year <= 2100:
+                raise ValueError
+            day = parse_date(q.get("date", "")) if q.get("date") else None
+            period = resolve_period(kind, year, month, day)
+        except (ValueError, TypeError):
+            return Response({"detail": "Invalid year, month or date."}, status=400)
+
+        report = build_period_report(period)
+        export = q.get("export")
+        if not export:
+            return Response(report)
+        if export not in self.EXPORTS:
+            return Response({"detail": "export must be pdf, csv or xlsx"}, status=400)
+        builder, content_type = self.EXPORTS[export]
+        response = HttpResponse(builder(report), content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="{report_filename(report, export)}"'
+        return response

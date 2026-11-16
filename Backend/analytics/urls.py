@@ -9,6 +9,7 @@ from .views import (
     ExpenseViewSet,
     OverviewView,
     PeakHoursView,
+    PeriodReportView,
     RevenueProfitView,
     SalesReportView,
 )
@@ -24,6 +25,7 @@ urlpatterns = [
     path("customer-traffic/", CustomerTrafficView.as_view(), name="analytics-customer-traffic"),
     path("revenue-profit/", RevenueProfitView.as_view(), name="analytics-revenue-profit"),
     path("cashflow/", CashflowView.as_view(), name="analytics-cashflow"),
+    path("period-report/", PeriodReportView.as_view(), name="analytics-period-report"),
     path("employee-performance/", EmployeePerformanceView.as_view(), name="analytics-employee-performance"),
     path("", include(router.urls)),
 ]

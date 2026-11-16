@@ -8,7 +8,9 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-LOGO_PATH = Path(__file__).resolve().parent / "assets" / "share-logo.png"
+# The old Share Cafe swan logo no longer applies after the Swalif rebrand; drop a Swalif
+# logo PNG at this path to show it on payslips (it is skipped while the file is absent).
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "swalif-logo.png"
 BRAND_COLOR = colors.HexColor("#0f766e")
 
 
@@ -29,7 +31,7 @@ def generate_payslip_pdf(payslip) -> bytes:
     # Letterhead: real logo + company details on the left, "PAYSLIP" + reference on the right.
     logo = Image(str(LOGO_PATH), width=16 * mm, height=16 * mm) if LOGO_PATH.exists() else Paragraph("", styles["Normal"])
     letterhead_left = [
-        [logo, Paragraph("<b>Share Cafe</b>", styles["Heading2"])],
+        [logo, Paragraph("<b>Swalif Cafe</b>", styles["Heading2"])],
     ]
     logo_table = Table(letterhead_left, colWidths=[18 * mm, 60 * mm])
     logo_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
@@ -47,7 +49,7 @@ def generate_payslip_pdf(payslip) -> bytes:
 
     elements = [
         header,
-        Paragraph("Al Saada, Salalah, Oman", muted_style),
+        Paragraph("Al Saadah, Salalah, Oman", muted_style),
         Spacer(1, 10),
     ]
 
@@ -110,7 +112,7 @@ def generate_payslip_pdf(payslip) -> bytes:
     if generated_by_name:
         footer_bits.append(f"by {generated_by_name}")
     elements.append(Paragraph(" &middot; ".join(footer_bits), muted_style))
-    elements.append(Paragraph("This is a system-generated payslip from Share Cafe's payroll records.", muted_style))
+    elements.append(Paragraph("This is a system-generated payslip from Swalif Cafe's payroll records.", muted_style))
 
     doc.build(elements)
     return buffer.getvalue()
