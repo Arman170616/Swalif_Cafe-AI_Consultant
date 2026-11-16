@@ -8,6 +8,7 @@ import {
   LifeBuoy,
   X,
   LogOut,
+  Ticket,
 } from 'lucide-react';
 import type { Role } from '../../contexts/AuthContext';
 import { BrandMark } from '../BrandMark';
@@ -22,6 +23,7 @@ export type NavKey =
   | 'inventory'
   | 'hr'
   | 'reports'
+  | 'packages'
   | 'help';
 
 type NavItem = {
@@ -45,6 +47,7 @@ const groups: { titleKey: TranslationKey; items: NavItem[] }[] = [
     items: [
       { key: 'pos', labelKey: 'nav.pos', icon: ShoppingCart, badge: 'nav.live', roles: ['admin', 'manager'] },
       { key: 'inventory', labelKey: 'nav.inventory', icon: Boxes, roles: ['admin', 'manager'] },
+      { key: 'packages', labelKey: 'nav.packages', icon: Ticket, roles: ['admin', 'manager'] },
     ],
   },
   {

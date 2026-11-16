@@ -12,6 +12,9 @@ class Order(models.Model):
         TAKEAWAY = "takeaway", "Takeaway"
         DELIVERY = "delivery", "Delivery"
         TALABAT = "talabat", "Talabat"
+        # Selling a prepaid monthly package (crm.CustomerPackage) — an order with no items
+        # whose subtotal is the package price, so it flows into sales/VAT reports normally.
+        PACKAGE = "package", "Package sale"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

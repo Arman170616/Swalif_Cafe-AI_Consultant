@@ -1,5 +1,6 @@
 from django.db.models import Count, Sum
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -76,6 +77,21 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Payment.objects.all()
+    """Payments ledger (Accounting page). Admin/Manager only — staff take payments through
+    orders/add_payment and don't need to browse everyone's takings.
+    ?start=YYYY-MM-DD&end=YYYY-MM-DD filters by payment date (inclusive)."""
+
+    queryset = Payment.objects.select_related("order__customer", "received_by").order_by("-paid_at")
     serializer_class = PaymentSerializer
+    permission_classes = [IsManagerOrAdmin]
     filterset_fields = ["order", "method"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        start = parse_date(self.request.query_params.get("start", "") or "")
+        end = parse_date(self.request.query_params.get("end", "") or "")
+        if start:
+            qs = qs.filter(paid_at__date__gte=start)
+        if end:
+            qs = qs.filter(paid_at__date__lte=end)
+        return qs

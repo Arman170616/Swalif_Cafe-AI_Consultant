@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum
 from django.db.models.functions import ExtractHour, TruncDate, TruncMonth
 from django.utils import timezone
 
@@ -112,6 +112,8 @@ def build_period_report(period: Period) -> dict:
         "expenses": expense_total,
         "net_profit": net_sales - cogs - expense_total,
         "payments_received": payments_received,
+        # Prepaid monthly packages sold (excl. VAT) — already included in net_sales.
+        "package_sales": _d(orders.filter(order_type=Order.OrderType.PACKAGE).aggregate(v=Sum("subtotal"))["v"]),
     }
 
     return {
@@ -167,11 +169,43 @@ def build_period_report(period: Period) -> dict:
             {"category": r["category"], "count": r["count"], "total": _d(r["total"])}
             for r in expenses.values("category").annotate(count=Count("id"), total=Sum("amount")).order_by("-total")
         ],
+        "top_customers": top_customers(orders),
         "expense_items": [
             {"date": e.date, "category": e.category, "amount": _d(e.amount), "note": e.note}
             for e in expenses.order_by("date", "id")
         ],
     }
+
+
+def top_customers(orders, limit: int = 20) -> list[dict]:
+    """Best clients in the period: ranked by amount spent, then number of orders.
+
+    `orders` counts visits (regular orders + package redemptions; buying the package
+    itself isn't a visit). `amount` is what they paid incl. VAT — package purchases count,
+    redemptions are 0 because the package already paid for them."""
+    rows = (
+        orders.filter(customer__isnull=False)
+        .values("customer_id", "customer__name", "customer__phone")
+        .annotate(
+            visits=Count("id", filter=~Q(order_type=Order.OrderType.PACKAGE)),
+            amount=Sum("total"),
+            packages=Count("id", filter=Q(order_type=Order.OrderType.PACKAGE)),
+            last=Max("created_at"),
+        )
+        .order_by("-amount", "-visits")[:limit]
+    )
+    return [
+        {
+            "customer": r["customer_id"],
+            "name": r["customer__name"],
+            "phone": r["customer__phone"],
+            "orders": r["visits"],
+            "amount": _d(r["amount"]),
+            "packages_bought": r["packages"],
+            "last_visit": timezone.localtime(r["last"]).date() if r["last"] else None,
+        }
+        for r in rows
+    ]
 
 
 def _breakdown(period: Period, orders, items, expenses, line_cost) -> list[dict]:
@@ -252,6 +286,7 @@ SUMMARY_ROWS = [
     ("Expenses", "expenses"),
     ("Net profit", "net_profit"),
     ("Payments received", "payments_received"),
+    ("  of which package sales (excl. VAT)", "package_sales"),
 ]
 
 BREAKDOWN_HEADERS = ["Period", "Orders", "Net sales", "VAT", "Cost of goods", "Expenses", "Net profit"]
@@ -278,6 +313,11 @@ def _sections(report: dict, english_only: bool = False) -> list[tuple[str, list[
             "Sales by product",
             ["Product", "Category", "Qty sold", "Revenue"],
             [[name(r["product"]), name(r["category"]), r["quantity"], r["revenue"]] for r in report["products"]],
+        ),
+        (
+            "Top clients",
+            ["Client", "Phone", "Orders", "Amount (incl. VAT)", "Last visit"],
+            [[r["name"], r["phone"], r["orders"], r["amount"], r["last_visit"].isoformat() if r["last_visit"] else ""] for r in report["top_customers"]],
         ),
         ("Payments by method", ["Method", "Payments", "Amount"], [[r["label"], r["count"], r["total"]] for r in report["payments"]]),
         ("Orders by type", ["Type", "Orders", "Net sales"], [[r["label"], r["count"], r["net_sales"]] for r in report["order_types"]]),

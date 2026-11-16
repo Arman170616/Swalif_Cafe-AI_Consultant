@@ -10,6 +10,7 @@ import { HRPage } from './components/dashboard/pages/HRPage';
 import { StaffHRPage } from './components/dashboard/pages/StaffHRPage';
 import { ReportsPage } from './components/dashboard/pages/ReportsPage';
 import { HelpPage } from './components/dashboard/pages/HelpPage';
+import { PackagesPage } from './components/dashboard/pages/PackagesPage';
 import { AuthPage } from './pages/auth/AuthPage';
 import { RequireRole } from './components/RequireRole';
 import { useAuth } from './contexts/AuthContext';
@@ -23,6 +24,7 @@ const meta: Record<NavKey, { titleKey: TranslationKey; subtitleKey: TranslationK
   accounting: { titleKey: 'title.accounting', subtitleKey: 'subtitle.accounting' },
   hr: { titleKey: 'title.hr', subtitleKey: 'subtitle.hr' },
   reports: { titleKey: 'title.reports', subtitleKey: 'subtitle.reports' },
+  packages: { titleKey: 'title.packages', subtitleKey: 'subtitle.packages' },
   help: { titleKey: 'title.help', subtitleKey: 'subtitle.help' },
 };
 
@@ -84,6 +86,11 @@ function App() {
       {active === 'reports' && (
         <RequireRole roles={['admin']}>
           <ReportsPage />
+        </RequireRole>
+      )}
+      {active === 'packages' && (
+        <RequireRole roles={['admin', 'manager']}>
+          <PackagesPage />
         </RequireRole>
       )}
       {active === 'help' && <HelpPage />}

@@ -48,6 +48,17 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     write_roles = (User.Role.ADMIN,)
     filterset_fields = ["category", "date"]
 
+    def get_queryset(self):
+        """?start=YYYY-MM-DD&end=YYYY-MM-DD limits to a date range (inclusive)."""
+        qs = super().get_queryset()
+        start = parse_date(self.request.query_params.get("start", "") or "")
+        end = parse_date(self.request.query_params.get("end", "") or "")
+        if start:
+            qs = qs.filter(date__gte=start)
+        if end:
+            qs = qs.filter(date__lte=end)
+        return qs
+
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 

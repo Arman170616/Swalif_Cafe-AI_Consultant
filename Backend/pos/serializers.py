@@ -26,9 +26,16 @@ class OrderItemInputSerializer(serializers.Serializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    order_type = serializers.CharField(source="order.order_type", read_only=True)
+    customer_name = serializers.CharField(source="order.customer.name", read_only=True, default=None)
+    received_by_username = serializers.CharField(source="received_by.username", read_only=True, default=None)
+
     class Meta:
         model = Payment
-        fields = ["id", "order", "method", "amount", "received_by", "paid_at"]
+        fields = [
+            "id", "order", "order_type", "customer_name", "method", "amount",
+            "received_by", "received_by_username", "paid_at",
+        ]
         read_only_fields = ["received_by", "paid_at"]
 
 

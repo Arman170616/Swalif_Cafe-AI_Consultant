@@ -27,9 +27,14 @@ import {
   Ban,
   LayoutGrid,
   List,
+  Ticket,
+  UserPlus,
 } from 'lucide-react';
 import { GlassCard, GlassButton } from '../../ui';
 import { MenuItems, splitName, useLocalName, type MenuView } from './MenuItems';
+import { PackagePicker } from './PackagePicker';
+import { ClientPicker, type Client } from './ClientPicker';
+import { leftToday, type CustomerPackage } from '../../../lib/packages';
 import { printThermalReceipt, type ReceiptData } from '../../../utils/thermalPrint';
 import { api, ApiError } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -117,6 +122,13 @@ export function POSPage() {
   const [charging, setCharging] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrder, setLastOrder] = useState<ReceiptData | null>(null);
+  // Monthly package client this order is redeemed against (null = normal paid order).
+  const [pkgClient, setPkgClient] = useState<CustomerPackage | null>(null);
+  const [showPkgPicker, setShowPkgPicker] = useState(false);
+  const [pkgNotice, setPkgNotice] = useState<string | null>(null);
+  // Optional client on a normal paid order (loyalty points + best-clients ranking).
+  const [client, setClient] = useState<Client | null>(null);
+  const [showClientPicker, setShowClientPicker] = useState(false);
 
   const [orders, setOrders] = useState<OrderT[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -215,6 +227,19 @@ export function POSPage() {
   const vat = subtotal * 0.05;
   const total = subtotal + vat;
 
+  const cartCount = cart.reduce((s, l) => s + l.qty, 0);
+  const pkgIneligible = pkgClient && pkgClient.eligible_categories.length
+    ? cart.filter((l) => l.product.category === null || !pkgClient.eligible_categories.includes(l.product.category))
+    : [];
+  const pkgAllowedNow = pkgClient ? leftToday(pkgClient) : 0;
+  const pkgBlocked = !!pkgClient && (cartCount === 0 || pkgIneligible.length > 0 || cartCount > pkgAllowedNow);
+
+  useEffect(() => {
+    if (!pkgNotice) return;
+    const id = setTimeout(() => setPkgNotice(null), 7000);
+    return () => clearTimeout(id);
+  }, [pkgNotice]);
+
   const takenByName = takenByOptions.find((s) => s.id === servedBy)?.username ?? user?.username ?? '';
 
   const handlePrintPreview = () => {
@@ -239,6 +264,7 @@ export function POSPage() {
         order_type: orderSource === 'Talabat' ? 'talabat' : 'dine_in',
         table_number: tableNote,
         served_by: servedBy,
+        customer: client?.id ?? null,
         items: cart.map((l) => ({ product: l.product.id, quantity: l.qty })),
       });
       const methodMap = { Cash: 'cash', Card: 'card', Wallet: 'mobile' } as const;
@@ -258,6 +284,28 @@ export function POSPage() {
       setShowReceipt(true);
       setCart([]);
       setTableNote('');
+      setClient(null);
+      loadOrders();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : t('pos.chargeFailed'));
+    } finally {
+      setCharging(false);
+    }
+  }
+
+  async function handleRedeem() {
+    if (!pkgClient || pkgBlocked || charging) return;
+    setCharging(true);
+    try {
+      const res = await api.post<{ package: CustomerPackage }>(`/crm/packages/${pkgClient.id}/redeem/`, {
+        items: cart.map((l) => ({ product: l.product.id, quantity: l.qty })),
+        served_by: servedBy,
+        table_number: tableNote,
+      });
+      setPkgNotice(t('pkg.redeemedNotice', { n: String(cartCount), name: pkgClient.customer_name, left: String(res.package.drinks_remaining) }));
+      setCart([]);
+      setTableNote('');
+      setPkgClient(null);
       loadOrders();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : t('pos.chargeFailed'));
@@ -500,6 +548,49 @@ export function POSPage() {
                 </div>
               </div>
 
+              <div className="mt-2">
+                {pkgClient ? (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-brand-200 bg-brand-50/80 px-2.5 py-2">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-600 text-white"><Ticket className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-bold text-ink-900">{pkgClient.customer_name}</div>
+                      <div className="truncate text-[10px] text-ink-600">
+                        {pkgClient.plan_name} · {t('pkg.leftCount', { n: String(pkgClient.drinks_remaining) })}
+                        {pkgClient.daily_limit ? ` · ${t('pkg.todayCount', { used: String(pkgClient.used_today), limit: String(pkgClient.daily_limit) })}` : ''}
+                      </div>
+                    </div>
+                    <button onClick={() => setPkgClient(null)} className="grid h-6 w-6 place-items-center rounded-md text-ink-500 hover:bg-white" title={t('pkg.removeClient')}><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ) : client ? (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-accent-200 bg-accent-50/80 px-2.5 py-2">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent-400 to-accent-700 text-xs font-bold text-white">{client.name[0]?.toUpperCase()}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-bold text-ink-900">{client.name}</div>
+                      <div className="truncate text-[10px] text-ink-600" dir="ltr">{client.phone || '—'}</div>
+                    </div>
+                    <button onClick={() => setClient(null)} className="grid h-6 w-6 place-items-center rounded-md text-ink-500 hover:bg-white" title={t('client.remove')}><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => setShowClientPicker(true)}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-accent-400 py-2 text-[11px] font-semibold text-accent-700 transition-colors hover:bg-accent-50/60"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" /> {t('client.add')}
+                    </button>
+                    <button
+                      onClick={() => setShowPkgPicker(true)}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-300 py-2 text-[11px] font-semibold text-brand-700 transition-colors hover:bg-brand-50/60"
+                    >
+                      <Ticket className="h-3.5 w-3.5" /> {t('pkg.packageClient')}
+                    </button>
+                  </div>
+                )}
+                {pkgNotice && (
+                  <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] font-semibold text-emerald-700">{pkgNotice}</div>
+                )}
+              </div>
+
               <div className="no-scrollbar mt-3 flex-1 space-y-2 overflow-y-auto pr-0.5">
                 {cart.length === 0 && (
                   <div className="grid h-36 place-items-center rounded-2xl border border-dashed border-white/50 text-xs text-ink-400">{t('pos.tapToAdd')}</div>
@@ -527,13 +618,22 @@ export function POSPage() {
               <div className="mt-3 space-y-1.5 border-t border-white/40 pt-3 text-sm">
                 <Row label={t('pos.subtotal')} value={`OMR ${subtotal.toFixed(3)}`} />
                 <Row label={t('pos.vat')} value={`OMR ${vat.toFixed(3)}`} muted />
+                {pkgClient && <Row label={t('pkg.coveredByPackage')} value={`− OMR ${total.toFixed(3)}`} muted />}
                 <div className="flex items-center justify-between pt-1">
                   <span className="font-display text-base font-bold text-ink-900">{t('pos.total')}</span>
-                  <span className="font-display text-xl font-extrabold text-amber-700">OMR {total.toFixed(3)}</span>
+                  <span className="font-display text-xl font-extrabold text-amber-700">OMR {(pkgClient ? 0 : total).toFixed(3)}</span>
                 </div>
+                {pkgClient && pkgIneligible.length > 0 && (
+                  <p className="text-[11px] font-semibold text-rose-600">
+                    {t('pkg.notCovered', { items: pkgIneligible.map((l) => localName(l.product.name)).join(', ') })}
+                  </p>
+                )}
+                {pkgClient && pkgIneligible.length === 0 && cartCount > pkgAllowedNow && (
+                  <p className="text-[11px] font-semibold text-rose-600">{t('pkg.tooMany', { n: String(pkgAllowedNow) })}</p>
+                )}
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <div className={['mt-3 grid-cols-3 gap-1.5', pkgClient ? 'hidden' : 'grid'].join(' ')}>
                 {([{ icon: Banknote, label: 'Cash' as const, key: 'pos.cash' as const }, { icon: CreditCard, label: 'Card' as const, key: 'pos.card' as const }, { icon: Wallet, label: 'Wallet' as const, key: 'pos.wallet' as const }]).map((m) => (
                   <button
                     key={m.label}
@@ -552,9 +652,15 @@ export function POSPage() {
                 <GlassButton variant="glass" size="sm" className="w-full" onClick={handlePrintPreview}>
                   <Printer className="h-3.5 w-3.5" /> {t('common.print')}
                 </GlassButton>
-                <GlassButton variant="primary" size="sm" className="w-full !from-amber-500 !to-orange-600" onClick={handleCharge} disabled={charging || cart.length === 0}>
-                  {charging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `${t('pos.charge')} ${total > 0 ? `OMR ${total.toFixed(3)}` : ''}`}
-                </GlassButton>
+                {pkgClient ? (
+                  <GlassButton variant="primary" size="sm" className="w-full" onClick={handleRedeem} disabled={charging || pkgBlocked}>
+                    {charging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Ticket className="h-3.5 w-3.5" /> {t('pkg.redeemN', { n: String(cartCount) })}</>}
+                  </GlassButton>
+                ) : (
+                  <GlassButton variant="primary" size="sm" className="w-full !from-amber-500 !to-orange-600" onClick={handleCharge} disabled={charging || cart.length === 0}>
+                    {charging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `${t('pos.charge')} ${total > 0 ? `OMR ${total.toFixed(3)}` : ''}`}
+                  </GlassButton>
+                )}
               </div>
             </GlassCard>
           </div>
@@ -740,6 +846,18 @@ export function POSPage() {
         </div>
       )}
 
+      {showClientPicker && (
+        <ClientPicker
+          onPick={(c) => { setClient(c); setShowClientPicker(false); }}
+          onClose={() => setShowClientPicker(false)}
+        />
+      )}
+      {showPkgPicker && (
+        <PackagePicker
+          onPick={(p) => { setPkgClient(p); setShowPkgPicker(false); }}
+          onClose={() => setShowPkgPicker(false)}
+        />
+      )}
       {showReceipt && lastOrder && (
         <ReceiptModal data={lastOrder} onClose={() => setShowReceipt(false)} onPrint={() => printThermalReceipt(lastOrder)} />
       )}
